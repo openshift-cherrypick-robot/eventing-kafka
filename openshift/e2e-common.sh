@@ -109,11 +109,11 @@ function install_knative_eventing(){
 }
 
 function install_knative_kafka {
-  install_knative_kafka_channel || return 1
+  install_consolidated_knative_kafka_channel || return 1
   install_knative_kafka_source || return 1
 }
 
-function install_knative_kafka_channel(){
+function install_consolidated_knative_kafka_channel(){
   header "Installing Knative Kafka Channel"
 
   RELEASE_YAML="openshift/release/knative-eventing-kafka-channel-ci.yaml"
