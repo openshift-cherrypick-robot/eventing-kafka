@@ -62,8 +62,6 @@ function install_tracing() {
   echo "Installing Zipkin..."
   sed "s/\${SYSTEM_NAMESPACE}/${SYSTEM_NAMESPACE}/g" < "${KNATIVE_EVENTING_MONITORING_YAML}" | oc apply -f -
   wait_until_pods_running "${SYSTEM_NAMESPACE}" || fail_test "Zipkin inside eventing did not come up"
-  # Setup config tracing for tracing tests
-  sed "s/\${SYSTEM_NAMESPACE}/${SYSTEM_NAMESPACE}/g" <  "${CONFIG_TRACING_CONFIG}" | oc apply -f -
 }
 
 function install_strimzi(){
