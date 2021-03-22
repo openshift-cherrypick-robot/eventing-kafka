@@ -95,17 +95,6 @@ function install_serverless(){
   return $failed
 }
 
-function install_knative_eventing(){
-  header "Installing Knative Eventing 0.20.0"
-
-  oc apply -f https://raw.githubusercontent.com/openshift/knative-eventing/release-v0.20.0/openshift/release/knative-eventing-ci.yaml || return 1
-  oc apply -f https://raw.githubusercontent.com/openshift/knative-eventing/release-v0.20.0/openshift/release/knative-eventing-mtbroker-ci.yaml || return 1
-
-  # Wait for 5 pods to appear first
-  timeout 900 '[[ $(oc get pods -n $EVENTING_NAMESPACE --no-headers | wc -l) -lt 5 ]]' || return 1
-  wait_until_pods_running $EVENTING_NAMESPACE || return 1
-}
-
 function install_knative_kafka {
   install_knative_kafka_channel || return 1
   install_knative_kafka_source || return 1

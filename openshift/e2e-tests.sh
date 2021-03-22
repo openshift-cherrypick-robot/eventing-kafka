@@ -18,8 +18,6 @@ failed=0
 
 (( !failed )) && install_serverless || failed=1
 
-##(( !failed )) && install_knative_eventing || failed=1
-
 (( !failed )) && install_knative_kafka || failed=1
 
 (( !failed )) && install_tracing || failed=1
