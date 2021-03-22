@@ -62,8 +62,6 @@ function install_tracing() {
   echo "Installing Zipkin..."
   sed "s/\${SYSTEM_NAMESPACE}/${SYSTEM_NAMESPACE}/g" < "${KNATIVE_EVENTING_MONITORING_YAML}" | oc apply -f -
   wait_until_pods_running "${SYSTEM_NAMESPACE}" || fail_test "Zipkin inside eventing did not come up"
-  # Setup config tracing for tracing tests
-  sed "s/\${SYSTEM_NAMESPACE}/${SYSTEM_NAMESPACE}/g" <  "${CONFIG_TRACING_CONFIG}" | oc apply -f -
 }
 
 function install_strimzi(){
@@ -92,20 +90,9 @@ function install_serverless(){
   unset OPENSHIFT_CI
   pushd $operator_dir
 
-  INSTALL_EVENTING="false" ./hack/install.sh && header "Serverless Operator installed successfully" || failed=1
+  ./hack/install.sh && header "Serverless Operator installed successfully" || failed=1
   popd
   return $failed
-}
-
-function install_knative_eventing(){
-  header "Installing Knative Eventing 0.20.0"
-
-  oc apply -f https://raw.githubusercontent.com/openshift/knative-eventing/release-v0.20.0/openshift/release/knative-eventing-ci.yaml || return 1
-  oc apply -f https://raw.githubusercontent.com/openshift/knative-eventing/release-v0.20.0/openshift/release/knative-eventing-mtbroker-ci.yaml || return 1
-
-  # Wait for 5 pods to appear first
-  timeout 900 '[[ $(oc get pods -n $EVENTING_NAMESPACE --no-headers | wc -l) -lt 5 ]]' || return 1
-  wait_until_pods_running $EVENTING_NAMESPACE || return 1
 }
 
 function install_knative_kafka {
@@ -183,7 +170,8 @@ function run_e2e_tests(){
   create_auth_secrets || return 1
 
   oc get ns ${SYSTEM_NAMESPACE} 2>/dev/null || SYSTEM_NAMESPACE="knative-eventing"
-  sed "s/namespace: ${KNATIVE_DEFAULT_NAMESPACE}/namespace: ${SYSTEM_NAMESPACE}/g" ${CONFIG_TRACING_CONFIG} | oc replace -f -
+  oc -n ${SYSTEM_NAMESPACE} patch knativeeventing/knative-eventing --type=merge --patch='{"spec": {"config": { "tracing": {"enable":"true","backend":"zipkin", "zipkin-endpoint":"http://zipkin.'${SYSTEM_NAMESPACE}'.svc.cluster.local:9411/api/v2/spans", "debug":"true", "sample-rate":"1.0"}}}}'
+
   local test_name="${1:-}"
   local run_command=""
   local failed=0
