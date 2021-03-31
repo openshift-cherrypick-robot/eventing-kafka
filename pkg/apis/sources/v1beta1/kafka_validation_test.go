@@ -29,6 +29,14 @@ var (
 	fullSpec = KafkaSourceSpec{
 		KafkaAuthSpec: bindingsv1beta1.KafkaAuthSpec{
 			BootstrapServers: []string{"servers"},
+			Net: bindingsv1beta1.KafkaNetSpec{
+				SASL: bindingsv1beta1.KafkaSASLSpec{
+					Enable: false,
+				},
+				TLS: bindingsv1beta1.KafkaTLSSpec{
+					Enable: false,
+				},
+			},
 		},
 		Topics:        []string{"topics"},
 		ConsumerGroup: "group",
@@ -44,6 +52,64 @@ var (
 	}
 )
 
+func TestKafkaSourceCheckRequiredFields(t *testing.T) {
+	testCases := map[string]struct {
+		orig    *KafkaSourceSpec
+		allowed bool
+	}{
+		"nil original": {
+			orig:    &KafkaSourceSpec{},
+			allowed: false,
+		},
+		"nil topic": {
+			allowed: false,
+			orig: &KafkaSourceSpec{
+				KafkaAuthSpec: fullSpec.KafkaAuthSpec,
+				SourceSpec:    fullSpec.SourceSpec,
+			},
+		},
+		"nil bootstrapServer": {
+			orig: &KafkaSourceSpec{
+				Topics:     fullSpec.Topics,
+				SourceSpec: fullSpec.SourceSpec,
+			},
+			allowed: false,
+		},
+		"nil sink": {
+			orig: &KafkaSourceSpec{
+				KafkaAuthSpec: fullSpec.KafkaAuthSpec,
+				Topics:        fullSpec.Topics,
+			},
+			allowed: false,
+		},
+		"min required fields": {
+			orig: &KafkaSourceSpec{
+				KafkaAuthSpec: fullSpec.KafkaAuthSpec,
+				Topics:        fullSpec.Topics,
+				SourceSpec:    fullSpec.SourceSpec,
+			},
+			allowed: true,
+		},
+		"full source": {
+			orig:    &fullSpec,
+			allowed: true,
+		},
+	}
+	for n, tc := range testCases {
+		t.Run(n, func(t *testing.T) {
+			ctx := context.TODO()
+			orig := &KafkaSource{
+				Spec: *tc.orig,
+			}
+			ctx = apis.WithinCreate(ctx)
+			err := orig.Validate(ctx)
+			if tc.allowed != (err == nil) {
+				t.Fatalf("Required Field Not Included: %v", err)
+			}
+		})
+	}
+}
+
 func TestKafkaSourceCheckImmutableFields(t *testing.T) {
 	testCases := map[string]struct {
 		orig    *KafkaSourceSpec
@@ -57,10 +123,11 @@ func TestKafkaSourceCheckImmutableFields(t *testing.T) {
 		"Topic changed": {
 			orig: &fullSpec,
 			updated: KafkaSourceSpec{
-				Topics:     []string{"some-other-topic"},
-				SourceSpec: fullSpec.SourceSpec,
+				Topics:        []string{"some-other-topic"},
+				ConsumerGroup: fullSpec.ConsumerGroup,
+				SourceSpec:    fullSpec.SourceSpec,
 			},
-			allowed: false,
+			allowed: true,
 		},
 		"Bootstrap servers changed": {
 			orig: &fullSpec,
@@ -68,14 +135,16 @@ func TestKafkaSourceCheckImmutableFields(t *testing.T) {
 				KafkaAuthSpec: bindingsv1beta1.KafkaAuthSpec{
 					BootstrapServers: []string{"server1,server2"},
 				},
-				SourceSpec: fullSpec.SourceSpec,
+				ConsumerGroup: fullSpec.ConsumerGroup,
+				SourceSpec:    fullSpec.SourceSpec,
 			},
-			allowed: false,
+			allowed: true,
 		},
 		"Sink.APIVersion changed": {
 			orig: &fullSpec,
 			updated: KafkaSourceSpec{
-				Topics: fullSpec.Topics,
+				Topics:        fullSpec.Topics,
+				ConsumerGroup: fullSpec.ConsumerGroup,
 				SourceSpec: duckv1.SourceSpec{
 					Sink: duckv1.Destination{
 						Ref: &duckv1.KReference{
@@ -87,12 +156,13 @@ func TestKafkaSourceCheckImmutableFields(t *testing.T) {
 					},
 				},
 			},
-			allowed: false,
+			allowed: true,
 		},
 		"Sink.Kind changed": {
 			orig: &fullSpec,
 			updated: KafkaSourceSpec{
-				Topics: fullSpec.Topics,
+				Topics:        fullSpec.Topics,
+				ConsumerGroup: fullSpec.ConsumerGroup,
 				SourceSpec: duckv1.SourceSpec{
 					Sink: duckv1.Destination{
 						Ref: &duckv1.KReference{
@@ -104,12 +174,13 @@ func TestKafkaSourceCheckImmutableFields(t *testing.T) {
 					},
 				},
 			},
-			allowed: false,
+			allowed: true,
 		},
 		"Sink.Namespace changed": {
 			orig: &fullSpec,
 			updated: KafkaSourceSpec{
-				Topics: fullSpec.Topics,
+				Topics:        fullSpec.Topics,
+				ConsumerGroup: fullSpec.ConsumerGroup,
 				SourceSpec: duckv1.SourceSpec{
 					Sink: duckv1.Destination{
 						Ref: &duckv1.KReference{
@@ -121,12 +192,13 @@ func TestKafkaSourceCheckImmutableFields(t *testing.T) {
 					},
 				},
 			},
-			allowed: false,
+			allowed: true,
 		},
 		"Sink.Name changed": {
 			orig: &fullSpec,
 			updated: KafkaSourceSpec{
-				Topics: fullSpec.Topics,
+				Topics:        fullSpec.Topics,
+				ConsumerGroup: fullSpec.ConsumerGroup,
 				SourceSpec: duckv1.SourceSpec{
 					Sink: duckv1.Destination{
 						Ref: &duckv1.KReference{
@@ -138,7 +210,7 @@ func TestKafkaSourceCheckImmutableFields(t *testing.T) {
 					},
 				},
 			},
-			allowed: false,
+			allowed: true,
 		},
 		"ServiceAccountName changed": {
 			orig: &fullSpec,
@@ -160,6 +232,45 @@ func TestKafkaSourceCheckImmutableFields(t *testing.T) {
 		"no change": {
 			orig:    &fullSpec,
 			updated: fullSpec,
+			allowed: true,
+		},
+		"consumerGroup changed": {
+			orig: &fullSpec,
+			updated: KafkaSourceSpec{
+				ConsumerGroup: "no-way",
+			},
+			allowed: false,
+		},
+		"Kafka TLS Spec changed": {
+			orig: &fullSpec,
+			updated: KafkaSourceSpec{
+				ConsumerGroup: fullSpec.ConsumerGroup,
+				SourceSpec:    fullSpec.SourceSpec,
+				Topics:        fullSpec.Topics,
+				KafkaAuthSpec: bindingsv1beta1.KafkaAuthSpec{
+					Net: bindingsv1beta1.KafkaNetSpec{
+						TLS: bindingsv1beta1.KafkaTLSSpec{
+							Enable: true,
+						},
+					},
+				},
+			},
+			allowed: true,
+		},
+		"Kafka SASL Spec changed": {
+			orig: &fullSpec,
+			updated: KafkaSourceSpec{
+				ConsumerGroup: fullSpec.ConsumerGroup,
+				SourceSpec:    fullSpec.SourceSpec,
+				Topics:        fullSpec.Topics,
+				KafkaAuthSpec: bindingsv1beta1.KafkaAuthSpec{
+					Net: bindingsv1beta1.KafkaNetSpec{
+						SASL: bindingsv1beta1.KafkaSASLSpec{
+							Enable: true,
+						},
+					},
+				},
+			},
 			allowed: true,
 		},
 	}
