@@ -9,10 +9,10 @@ channel_output_file="openshift/release/knative-eventing-kafka-channel-ci.yaml"
 distributed_channel_output_file="openshift/release/knative-eventing-kafka-distributed-channel-ci.yaml"
 
 if [ "$release" == "ci" ]; then
-    image_prefix="registry.svc.ci.openshift.org/openshift/knative-nightly:knative-eventing-kafka-"
+    image_prefix="registry.ci.openshift.org/openshift/knative-nightly:knative-eventing-kafka-"
     tag=""
 else
-    image_prefix="registry.svc.ci.openshift.org/openshift/knative-${release}:knative-eventing-kafka-"
+    image_prefix="registry.ci.openshift.org/openshift/knative-${release}:knative-eventing-kafka-"
     tag=""
 fi
 

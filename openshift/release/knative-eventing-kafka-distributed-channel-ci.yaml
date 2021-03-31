@@ -400,7 +400,7 @@ spec:
       serviceAccountName: eventing-kafka-channel-controller
       containers:
       - name: eventing-kafka
-        image: registry.svc.ci.openshift.org/openshift/knative-v0.19.1:knative-eventing-kafka-distributed-controller
+        image: registry.ci.openshift.org/openshift/knative-v0.19.1:knative-eventing-kafka-distributed-controller
         imagePullPolicy: IfNotPresent # Must be IfNotPresent or Never if used with ko.local
         ports:
         - containerPort: 8081
@@ -427,9 +427,9 @@ spec:
         - name: METRICS_DOMAIN
           value: "eventing-kafka"
         - name: RECEIVER_IMAGE
-          value: "registry.svc.ci.openshift.org/openshift/knative-v0.19.1:knative-eventing-kafka-receiver"
+          value: "registry.ci.openshift.org/openshift/knative-v0.19.1:knative-eventing-kafka-receiver"
         - name: DISPATCHER_IMAGE
-          value: "registry.svc.ci.openshift.org/openshift/knative-v0.19.1:knative-eventing-kafka-distributed-dispatcher"
+          value: "registry.ci.openshift.org/openshift/knative-v0.19.1:knative-eventing-kafka-distributed-dispatcher"
         resources:
           requests:
             cpu: 20m
