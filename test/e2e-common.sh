@@ -32,7 +32,7 @@
 
 TEST_PARALLEL=${MAX_PARALLEL_TESTS:-12}
 
-source $(dirname $0)/../vendor/knative.dev/hack/e2e-tests.sh
+source "$(dirname "$(dirname "${BASH_SOURCE[0]}")")/vendor/knative.dev/hack/e2e-tests.sh"
 
 # If gcloud is not available make it a no-op, not an error.
 which gcloud &> /dev/null || gcloud() { echo "[ignore-gcloud $*]" 1>&2; }
@@ -44,6 +44,7 @@ if [ "$(uname)" == "Darwin" ]; then
 fi
 
 # Eventing main config path from HEAD.
+readonly EVENTING_KAFKA_REPO="${EVENTING_KAFKA_REPO:-https://github.com/knative-sandbox/eventing-kafka}"
 readonly EVENTING_CONFIG="./config/"
 readonly EVENTING_MT_CHANNEL_BROKER_CONFIG="./config/brokers/mt-channel-broker"
 readonly EVENTING_IN_MEMORY_CHANNEL_CONFIG="./config/channels/in-memory-channel"
@@ -75,7 +76,7 @@ readonly EVENTING_KAFKA_CONFIG_TEMPLATE="300-eventing-kafka-configmap.yaml"
 # Strimzi installation config template used for starting up Kafka clusters.
 readonly STRIMZI_INSTALLATION_CONFIG_TEMPLATE="test/config/100-strimzi-cluster-operator-0.20.0.yaml"
 # Strimzi installation config.
-readonly STRIMZI_INSTALLATION_CONFIG="$(mktemp)"
+readonly STRIMZI_INSTALLATION_CONFIG="$(mktemp "${ARTIFACTS}/strimzi-XXXXX.yaml")"
 # Kafka cluster CR config file.
 readonly KAFKA_INSTALLATION_CONFIG="test/config/100-kafka-ephemeral-triple-2.6.0.yaml"
 # Kafka TLS ConfigMap.
@@ -95,13 +96,12 @@ KAFKA_CLUSTER_URL=${KAFKA_PLAIN_CLUSTER_URL}
 # Kafka channel CRD config template file. It needs to be modified to be the real config file.
 readonly KAFKA_CRD_CONFIG_TEMPLATE="400-kafka-config.yaml"
 
-# Real Kafka channel CRD config, generated from the template directory and modified template file.
-readonly KAFKA_CRD_CONFIG_DIR="$(mktemp -d)"
-# Real Kafka Source CRD config, generated from the template directory and modified template file.
-readonly KAFKA_SOURCE_CRD_CONFIG_DIR="$(mktemp -d)"
-
-# Remove the temporary directories on exit (avoiding "rm -rf" to prevent disaster if something is wrong with the variables)
-trap "{ for dirrm in \"${KAFKA_CRD_CONFIG_DIR}\" \"${KAFKA_SOURCE_CRD_CONFIG_DIR}\"; do rm \"\${dirrm}\"/*; rmdir \"\${dirrm}\"; done }" EXIT
+# Real Kafka channel CRD config, generated from the template directory and
+# modified template file.
+readonly KAFKA_CRD_CONFIG_DIR="$(mktemp -d "${ARTIFACTS}/channel-crd-XXXXX")"
+# Real Kafka Source CRD config, generated from the template directory and
+# modified template file.
+readonly KAFKA_SOURCE_CRD_CONFIG_DIR="$(mktemp -d "${ARTIFACTS}/source-crd-XXXXX")"
 
 # Kafka channel CRD config template directory.
 readonly KAFKA_SOURCE_TEMPLATE_DIR="config/source"
@@ -116,6 +116,10 @@ export SYSTEM_NAMESPACE
 
 # Zipkin setup
 readonly KNATIVE_EVENTING_MONITORING_YAML="test/config/monitoring.yaml"
+
+# Latest release. If user does not supply this as a flag, the latest
+# tagged release on the current branch will be used.
+LATEST_RELEASE_VERSION="${LATEST_RELEASE_VERSION:-$(latest_version)}"
 
 #
 # TODO - Consider adding this function to the test-infra library.sh utilities ?
@@ -160,6 +164,10 @@ function add_kn_eventing_test_pull_secret() {
 }
 
 function knative_setup() {
+  install_knative_eventing
+}
+
+function install_knative_eventing {
   if is_release_branch; then
     echo ">> Install Knative Eventing from ${KNATIVE_EVENTING_RELEASE}"
     kubectl apply -f ${KNATIVE_EVENTING_RELEASE}
@@ -222,11 +230,12 @@ function knative_teardown() {
 # Parameters: $1 - Function to call
 #             $2...$n - Signals for trap
 function add_trap() {
-  local cmd=$1
+  local current_trap new_cmd cmd
+  cmd=$1
   shift
-  for trap_signal in $@; do
-    local current_trap="$(trap -p $trap_signal | cut -d\' -f2)"
-    local new_cmd="($cmd)"
+  for trap_signal in "$@"; do
+    current_trap="$(trap -p $trap_signal | cut -d\' -f2)"
+    new_cmd="($cmd)"
     [[ -n "${current_trap}" ]] && new_cmd="${current_trap};${new_cmd}"
     trap -- "${new_cmd}" $trap_signal
   done
@@ -260,19 +269,51 @@ function test_teardown() {
   kafka_teardown
 }
 
-function install_consolidated_channel_crds() {
-  echo "Installing consolidated Kafka Channel CRD"
-  rm "${KAFKA_CRD_CONFIG_DIR}/"*yaml
-  cp "${CONSOLIDATED_TEMPLATE_DIR}/"*yaml "${KAFKA_CRD_CONFIG_DIR}"
-  sed -i "s/namespace: knative-eventing/namespace: ${SYSTEM_NAMESPACE}/g" "${KAFKA_CRD_CONFIG_DIR}/"*yaml
-  sed -i "s/REPLACE_WITH_CLUSTER_URL/${KAFKA_CLUSTER_URL}/" ${KAFKA_CRD_CONFIG_DIR}/${KAFKA_CRD_CONFIG_TEMPLATE}
-  ko apply -f "${KAFKA_CRD_CONFIG_DIR}" || return 1
-  wait_until_pods_running "${SYSTEM_NAMESPACE}" || fail_test "Failed to install the consolidated Kafka Channel CRD"
+function install_released_consolidated_channel {
+  install_consolidated_channel_crds latest-release
+}
+
+function install_head_consolidated_channel {
+  install_consolidated_channel_crds HEAD
+}
+
+function install_consolidated_channel_crds {
+  local source url ver release_yaml
+  source="${1:-HEAD}"
+  if [[ "${source}" == 'HEAD' ]]; then
+    echo "Installing consolidated Kafka Channel CRD (from HEAD)"
+    rm -rf "${KAFKA_CRD_CONFIG_DIR}" && mkdir -p "${KAFKA_CRD_CONFIG_DIR}"
+    cp "${CONSOLIDATED_TEMPLATE_DIR}/"*yaml "${KAFKA_CRD_CONFIG_DIR}"
+    sed -i "s/namespace: knative-eventing/namespace: ${SYSTEM_NAMESPACE}/g" \
+      "${KAFKA_CRD_CONFIG_DIR}/"*yaml
+    sed -i "s/REPLACE_WITH_CLUSTER_URL/${KAFKA_CLUSTER_URL}/" \
+      "${KAFKA_CRD_CONFIG_DIR}/${KAFKA_CRD_CONFIG_TEMPLATE}"
+    ko apply -f "${KAFKA_CRD_CONFIG_DIR}"
+  elif [[ "${source}" == 'latest-release' ]]; then
+    ver="${LATEST_RELEASE_VERSION}"
+    echo "Installing consolidated Kafka Channel CRD (from latest release: ${ver})"
+    # Download the latest release of Knative Eventing Kafka.
+    url="${EVENTING_KAFKA_REPO}/releases/download/${ver}/channel-consolidated.yaml"
+    release_yaml="${ARTIFACTS}/channel-consolidated-${ver}.yaml"
+
+    curl -Lo "${release_yaml}" "${url}"
+    sed -i "s/namespace: knative-eventing/namespace: ${SYSTEM_NAMESPACE}/g" \
+      "${release_yaml}"
+    sed -i "s/REPLACE_WITH_CLUSTER_URL/${KAFKA_CLUSTER_URL}/" \
+      "${release_yaml}"
+    echo "Applying: ${release_yaml}"
+    kubectl apply -f "${release_yaml}"
+  else
+    fail_test "Unsupported source of installation: ${source}"
+    return 55
+  fi
+  sleep 1 # Wait until something gets deployed
+  wait_until_pods_running "${SYSTEM_NAMESPACE}"
 }
 
 function install_consolidated_sources_crds() {
   echo "Installing consolidated Kafka Source CRD"
-  rm "${KAFKA_SOURCE_CRD_CONFIG_DIR}/"*yaml
+  rm -rf "${KAFKA_SOURCE_CRD_CONFIG_DIR}" && mkdir -p "${KAFKA_SOURCE_CRD_CONFIG_DIR}"
   cp "${KAFKA_SOURCE_TEMPLATE_DIR}/"*yaml "${KAFKA_SOURCE_CRD_CONFIG_DIR}"
   sed -i "s/namespace: knative-eventing/namespace: ${SYSTEM_NAMESPACE}/g" "${KAFKA_SOURCE_CRD_CONFIG_DIR}/"*yaml
   ko apply -f "${KAFKA_SOURCE_CRD_CONFIG_DIR}" || return 1
@@ -298,7 +339,7 @@ function uninstall_sources_crds() {
 
 function install_distributed_channel_crds() {
   echo "Installing distributed Kafka Channel CRD"
-  rm "${KAFKA_CRD_CONFIG_DIR}/"*yaml
+  rm -rf "${KAFKA_CRD_CONFIG_DIR}" && mkdir -p "${KAFKA_CRD_CONFIG_DIR}"
   cp "${DISTRIBUTED_TEMPLATE_DIR}/"*yaml "${KAFKA_CRD_CONFIG_DIR}"
   sed -i "s/namespace: knative-eventing/namespace: ${SYSTEM_NAMESPACE}/g" "${KAFKA_CRD_CONFIG_DIR}/"*yaml
 
@@ -325,7 +366,7 @@ function kafka_setup() {
   # Install Strimzi Into The Desired Namespace (Dynamically Changing The Namespace)
   sed "s/namespace: .*/namespace: ${STRIMZI_KAFKA_NAMESPACE}/" ${STRIMZI_INSTALLATION_CONFIG_TEMPLATE} > "${STRIMZI_INSTALLATION_CONFIG}"
 
-  # Create The Actual Kafka Cluster Instance For The Cluster Operator To Setup
+  echo "Create The Actual Kafka Cluster Instance For The Cluster Operator To Setup using: ${STRIMZI_INSTALLATION_CONFIG}"
   kubectl apply -f "${STRIMZI_INSTALLATION_CONFIG}" -n "${STRIMZI_KAFKA_NAMESPACE}"
   kubectl apply -f "${KAFKA_INSTALLATION_CONFIG}" -n "${STRIMZI_KAFKA_NAMESPACE}"
 
