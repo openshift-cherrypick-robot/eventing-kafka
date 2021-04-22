@@ -32,4 +32,7 @@ import (
 	_ "knative.dev/eventing/test/test_images/wathola-forwarder"
 	_ "knative.dev/eventing/test/test_images/wathola-receiver"
 	_ "knative.dev/eventing/test/test_images/wathola-sender"
+
+	// For migration
+	_ "knative.dev/pkg/apiextensions/storageversion/cmd/migrate"
 )
