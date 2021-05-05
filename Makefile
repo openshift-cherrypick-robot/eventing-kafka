@@ -4,7 +4,7 @@
 CGO_ENABLED=0
 GOOS=linux
 # Ignore errors if there are no images.
-CORE_IMAGES=$(shell find ./cmd -name main.go ! -path "./cmd/source/controller/*" ! -path "./cmd/channel/distributed/controller/*" ! -path "./cmd/channel/consolidated/controller/*" ! -path "./cmd/channel/consolidated/dispatcher/*" ! -path "./cmd/channel/distributed/dispatcher/*" | sed 's/main.go//')
+CORE_IMAGES=$(shell find ./cmd -name main.go ! -path "./cmd/source/controller/*" ! -path "./cmd/channel/distributed/controller/*" ! -path "./cmd/channel/consolidated/controller/*" ! -path "./cmd/channel/consolidated/dispatcher/*" ! -path "./cmd/channel/distributed/dispatcher/*" | sed 's/main.go//') ./vendor/knative.dev/pkg/apiextensions/storageversion/cmd/migrate
 TEST_IMAGES=$(shell find ./test/test_images ./vendor/knative.dev/eventing/test/test_images -mindepth 1 -maxdepth 1 -type d 2> /dev/null)
 KO_DOCKER_REPO=${DOCKER_REPO_OVERRIDE}
 BRANCH=
