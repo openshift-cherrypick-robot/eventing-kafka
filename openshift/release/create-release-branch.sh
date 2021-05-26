@@ -2,13 +2,13 @@
 
 # Usage: create-release-branch.sh v0.4.1 release-0.4
 
-set -e # Exit immediately on error.
+set -ex # Exit immediately on error.
 
 release=$1
 target=$2
 
 # Fetch the latest tags and checkout a new branch from the wanted tag.
-git fetch upstream --tags
+git fetch upstream -v --tags
 git checkout -b "$target" "$release"
 
 # Copy the openshift extra files from the OPENSHIFT/main branch.
