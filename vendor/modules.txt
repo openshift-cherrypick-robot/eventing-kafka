@@ -308,8 +308,11 @@ github.com/openzipkin/zipkin-go/model
 github.com/openzipkin/zipkin-go/propagation
 github.com/openzipkin/zipkin-go/reporter
 github.com/openzipkin/zipkin-go/reporter/http
-# github.com/pelletier/go-toml v1.8.0
-github.com/pelletier/go-toml
+# github.com/pelletier/go-toml/v2 v2.0.0-beta.2
+github.com/pelletier/go-toml/v2
+github.com/pelletier/go-toml/v2/internal/ast
+github.com/pelletier/go-toml/v2/internal/tracker
+github.com/pelletier/go-toml/v2/internal/unsafe
 # github.com/pierrec/lz4 v2.5.2+incompatible
 github.com/pierrec/lz4
 github.com/pierrec/lz4/internal/xxh32
@@ -356,7 +359,7 @@ github.com/slinkydeveloper/loadastic/kafka
 github.com/spf13/pflag
 # github.com/stretchr/objx v0.2.0
 github.com/stretchr/objx
-# github.com/stretchr/testify v1.6.1
+# github.com/stretchr/testify v1.7.0
 ## explicit
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/mock
@@ -1087,7 +1090,7 @@ k8s.io/utils/buffer
 k8s.io/utils/integer
 k8s.io/utils/pointer
 k8s.io/utils/trace
-# knative.dev/eventing v0.21.3
+# knative.dev/eventing v0.21.3 => github.com/openshift/knative-eventing v0.99.1-0.20210526121953-4c434bbf8650
 ## explicit
 knative.dev/eventing/pkg/adapter/v2
 knative.dev/eventing/pkg/adapter/v2/test
@@ -1228,6 +1231,7 @@ knative.dev/eventing/test/test_images/wathola-forwarder
 knative.dev/eventing/test/test_images/wathola-receiver
 knative.dev/eventing/test/test_images/wathola-sender
 knative.dev/eventing/test/upgrade/prober
+knative.dev/eventing/test/upgrade/prober/sut
 knative.dev/eventing/test/upgrade/prober/wathola/client
 knative.dev/eventing/test/upgrade/prober/wathola/config
 knative.dev/eventing/test/upgrade/prober/wathola/event
@@ -1351,3 +1355,4 @@ knative.dev/pkg/webhook/resourcesemantics/validation
 sigs.k8s.io/structured-merge-diff/v4/value
 # sigs.k8s.io/yaml v1.2.0
 sigs.k8s.io/yaml
+# knative.dev/eventing => github.com/openshift/knative-eventing v0.99.1-0.20210526121953-4c434bbf8650

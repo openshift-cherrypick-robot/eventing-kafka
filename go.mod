@@ -22,7 +22,7 @@ require (
 	github.com/mitchellh/mapstructure v1.3.3 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20200313005456-10cdbea86bc0
 	github.com/slinkydeveloper/loadastic v0.0.0-20201218203601-5c69eea3b7d8
-	github.com/stretchr/testify v1.6.1
+	github.com/stretchr/testify v1.7.0
 	github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c
 	go.opencensus.io v0.22.6
 	go.uber.org/atomic v1.7.0
@@ -39,3 +39,5 @@ require (
 	knative.dev/networking v0.0.0-20210304153916-f813b5904943
 	knative.dev/pkg v0.0.0-20210309024624-0f8d8de5949d
 )
+
+replace knative.dev/eventing => github.com/openshift/knative-eventing v0.99.1-0.20210526121953-4c434bbf8650
