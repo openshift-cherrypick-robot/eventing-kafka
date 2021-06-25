@@ -144,9 +144,6 @@ func TestKafkaBinding(t *testing.T) {
 	}
 	for name, tc := range tests {
 		tc := tc
-		t.Run(name+"-v1alpha1", func(t *testing.T) {
-			testKafkaBinding(t, "v1alpha1", tc.messageKey, tc.messageHeaders, tc.messagePayload, tc.expectedData)
-		})
 		t.Run(name+"-v1beta1", func(t *testing.T) {
 			testKafkaBinding(t, "v1beta1", tc.messageKey, tc.messageHeaders, tc.messagePayload, tc.expectedData)
 		})
