@@ -348,8 +348,11 @@ github.com/openzipkin/zipkin-go/model
 github.com/openzipkin/zipkin-go/propagation
 github.com/openzipkin/zipkin-go/reporter
 github.com/openzipkin/zipkin-go/reporter/http
-# github.com/pelletier/go-toml v1.8.0
-github.com/pelletier/go-toml
+# github.com/pelletier/go-toml/v2 v2.0.0-beta.2
+github.com/pelletier/go-toml/v2
+github.com/pelletier/go-toml/v2/internal/ast
+github.com/pelletier/go-toml/v2/internal/tracker
+github.com/pelletier/go-toml/v2/internal/unsafe
 # github.com/pierrec/lz4 v2.6.0+incompatible
 github.com/pierrec/lz4
 github.com/pierrec/lz4/internal/xxh32
@@ -1102,7 +1105,7 @@ knative.dev/control-protocol/pkg/message
 knative.dev/control-protocol/pkg/network
 knative.dev/control-protocol/pkg/reconciler
 knative.dev/control-protocol/pkg/service
-# knative.dev/eventing v0.23.0
+# knative.dev/eventing v0.23.0 => github.com/openshift/knative-eventing v0.99.1-0.20210628075213-25ebadbdd9b3
 ## explicit
 knative.dev/eventing/pkg/adapter/v2
 knative.dev/eventing/pkg/adapter/v2/test
@@ -1208,6 +1211,7 @@ knative.dev/eventing/test/test_images/wathola-forwarder
 knative.dev/eventing/test/test_images/wathola-receiver
 knative.dev/eventing/test/test_images/wathola-sender
 knative.dev/eventing/test/upgrade/prober
+knative.dev/eventing/test/upgrade/prober/sut
 knative.dev/eventing/test/upgrade/prober/wathola/client
 knative.dev/eventing/test/upgrade/prober/wathola/config
 knative.dev/eventing/test/upgrade/prober/wathola/event

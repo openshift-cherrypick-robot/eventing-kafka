@@ -245,7 +245,8 @@ func ParseDispatchResultAndReportMetrics(result DispatchResult, reporter channel
 
 // dispatch takes the event, fans it out to each subscription in subs. If all the fanned out
 // events return successfully, then return nil. Else, return an error.
-func (f *FanoutMessageHandler) dispatch(ctx context.Context, subs []Subscription, bufferedMessage binding.Message, additionalHeaders nethttp.Header) DispatchResult {	// Bind the lifecycle of the buffered message to the number of subs
+func (f *FanoutMessageHandler) dispatch(ctx context.Context, subs []Subscription, bufferedMessage binding.Message, additionalHeaders nethttp.Header) DispatchResult {
+	// Bind the lifecycle of the buffered message to the number of subs
 	bufferedMessage = buffering.WithAcksBeforeFinish(bufferedMessage, len(subs))
 
 	errorCh := make(chan DispatchResult, len(subs))
@@ -325,4 +326,3 @@ func NewDispatchResult(err error, info *channel.DispatchExecutionInfo) DispatchR
 		info: info,
 	}
 }
-
