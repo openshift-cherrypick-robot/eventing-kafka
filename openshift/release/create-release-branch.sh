@@ -14,6 +14,12 @@ git checkout -b "$target" "$release"
 # Copy the openshift extra files from the OPENSHIFT/main branch.
 git fetch openshift main
 git checkout openshift/main -- openshift OWNERS Makefile
+
+# Remove GH Action hooks from upstream
+rm -rf .github/workflows
+git commit -sm ":fire: remove unneeded workflows" .github/
+
+# Generate our OCP artifacts
 make generate-dockerfiles
 make RELEASE=$release generate-release
 git add openshift OWNERS Makefile
