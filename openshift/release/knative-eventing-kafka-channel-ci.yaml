@@ -245,6 +245,12 @@ rules:
   - apiGroups:
       - ""
     resources:
+      - "namespaces"
+    verbs:
+      - "get"
+  - apiGroups:
+      - ""
+    resources:
       - "namespaces/finalizers"
     verbs:
       - "update"
@@ -646,7 +652,7 @@ spec:
       serviceAccountName: kafka-ch-controller
       containers:
       - name: controller
-        image: registry.ci.openshift.org/openshift/knative-v0.24.0:knative-eventing-kafka-consolidated-controller
+        image: registry.ci.openshift.org/openshift/knative-v0.24.3:knative-eventing-kafka-consolidated-controller
         env:
         - name: CONFIG_LOGGING_NAME
           value: config-logging
@@ -663,7 +669,7 @@ spec:
         - name: CONFIG_LEADERELECTION_NAME
           value: config-leader-election
         - name: DISPATCHER_IMAGE
-          value: registry.ci.openshift.org/openshift/knative-v0.24.0:knative-eventing-kafka-consolidated-dispatcher
+          value: registry.ci.openshift.org/openshift/knative-v0.24.3:knative-eventing-kafka-consolidated-dispatcher
         - name: SERVICE_ACCOUNT
           value: kafka-ch-dispatcher
         ports:
@@ -732,7 +738,7 @@ spec:
       containers:
       - name: kafka-webhook
         terminationMessagePolicy: FallbackToLogsOnError
-        image: registry.ci.openshift.org/openshift/knative-v0.24.0:knative-eventing-kafka-webhook
+        image: registry.ci.openshift.org/openshift/knative-v0.24.3:knative-eventing-kafka-webhook
         env:
         - name: SYSTEM_NAMESPACE
           valueFrom:
