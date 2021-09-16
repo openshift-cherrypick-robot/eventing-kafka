@@ -6,7 +6,7 @@ source "$(dirname "$0")/e2e-common.sh"
 
 set -Eeuox pipefail
 
-export TEST_IMAGE_TEMPLATE="${IMAGE_FORMAT//\$\{component\}/knative-eventing-kafka-test-{{.Name}}}"
+export TEST_IMAGE_TEMPLATE="${EVENTING_KAFKA_TEST_IMAGE_TEMPLATE}"
 
 env
 
