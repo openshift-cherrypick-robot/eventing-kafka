@@ -12,6 +12,23 @@ export KAFKA_USERS_CONFIG="test/config/100-strimzi-users-0.20.0.yaml"
 export KAFKA_PLAIN_CLUSTER_URL="my-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"
 readonly KNATIVE_EVENTING_MONITORING_YAML="test/config/monitoring.yaml"
 KAFKA_CLUSTER_URL=${KAFKA_PLAIN_CLUSTER_URL}
+export EVENTING_KAFKA_TEST_IMAGE_TEMPLATE=$(cat <<-END
+{{- with .Name }}
+{{- if eq . "event-sender"}}$KNATIVE_EVENTING_KAFKA_TEST_EVENT_SENDER{{end -}}
+{{- if eq . "heartbeats"}}$KNATIVE_EVENTING_KAFKA_TEST_HEARTBEATS{{end -}}
+{{- if eq . "kafka-publisher"}}$KNATIVE_EVENTING_KAFKA_TEST_KAFKA_PUBLISHER{{end -}}
+{{- if eq . "kafka_performance"}}$KNATIVE_EVENTING_KAFKA_TEST_KAFKA_PERFORMANCE{{end -}}
+{{- if eq . "performance"}}$KNATIVE_EVENTING_KAFKA_TEST_PERFORMANCE{{end -}}
+{{- if eq . "print"}}$KNATIVE_EVENTING_KAFKA_TEST_PRINT{{end -}}
+{{- if eq . "recordevents"}}$KNATIVE_EVENTING_KAFKA_TEST_RECORDEVENTS{{end -}}
+{{- if eq . "wathola-fetcher"}}$KNATIVE_EVENTING_KAFKA_TEST_WATHOLA_FETCHER{{end -}}
+{{- if eq . "wathola-forwarder"}}$KNATIVE_EVENTING_KAFKA_TEST_WATHOLA_FORWARDER{{end -}}
+{{- if eq . "wathola-kafka-sender"}}$KNATIVE_EVENTING_KAFKA_TEST_WATHOLA_KAFKA_SENDER{{end -}}
+{{- if eq . "wathola-receiver"}}$KNATIVE_EVENTING_KAFKA_TEST_WATHOLA_RECEIVER{{end -}}
+{{- if eq . "wathola-sender"}}$KNATIVE_EVENTING_KAFKA_TEST_WATHOLA_SENDER{{end -}}
+{{end -}}
+END
+)
 
 function scale_up_workers(){
   local cluster_api_ns="openshift-machine-api"
@@ -105,9 +122,9 @@ function install_knative_kafka_channel(){
 
   RELEASE_YAML="openshift/release/knative-eventing-kafka-channel-ci.yaml"
 
-  sed -i -e "s|registry.svc.ci.openshift.org/openshift/knative-.*:knative-eventing-kafka-consolidated-controller|${IMAGE_FORMAT//\$\{component\}/knative-eventing-kafka-consolidated-controller}|g" ${RELEASE_YAML}
-  sed -i -e "s|registry.svc.ci.openshift.org/openshift/knative-.*:knative-eventing-kafka-consolidated-dispatcher|${IMAGE_FORMAT//\$\{component\}/knative-eventing-kafka-consolidated-dispatcher}|g" ${RELEASE_YAML}
-  sed -i -e "s|registry.svc.ci.openshift.org/openshift/knative-.*:knative-eventing-kafka-webhook|${IMAGE_FORMAT//\$\{component\}/knative-eventing-kafka-webhook}|g"                                 ${RELEASE_YAML}
+  sed -i -e "s|registry.svc.ci.openshift.org/openshift/knative-.*:knative-eventing-kafka-consolidated-controller|${KNATIVE_EVENTING_KAFKA_CONSOLIDATED_CONTROLLER}|g" ${RELEASE_YAML}
+  sed -i -e "s|registry.svc.ci.openshift.org/openshift/knative-.*:knative-eventing-kafka-consolidated-dispatcher|${KNATIVE_EVENTING_KAFKA_CONSOLIDATED_DISPATCHER}|g" ${RELEASE_YAML}
+  sed -i -e "s|registry.svc.ci.openshift.org/openshift/knative-.*:knative-eventing-kafka-webhook|${KNATIVE_EVENTING_KAFKA_WEBHOOK}|g"                                 ${RELEASE_YAML}
 
   cat ${RELEASE_YAML} \
   | sed "s/REPLACE_WITH_CLUSTER_URL/${KAFKA_CLUSTER_URL}/" \
@@ -121,8 +138,8 @@ function install_knative_kafka_source(){
 
   RELEASE_YAML="openshift/release/knative-eventing-kafka-source-ci.yaml"
 
-  sed -i -e "s|registry.svc.ci.openshift.org/openshift/knative-.*:knative-eventing-kafka-source-controller|${IMAGE_FORMAT//\$\{component\}/knative-eventing-kafka-source-controller}|g"   ${RELEASE_YAML}
-  sed -i -e "s|registry.svc.ci.openshift.org/openshift/knative-.*:knative-eventing-kafka-receive-adapter|${IMAGE_FORMAT//\$\{component\}/knative-eventing-kafka-receive-adapter}|g"       ${RELEASE_YAML}
+  sed -i -e "s|registry.svc.ci.openshift.org/openshift/knative-.*:knative-eventing-kafka-source-controller|${KNATIVE_EVENTING_KAFKA_SOURCE_CONTROLLER}|g"   ${RELEASE_YAML}
+  sed -i -e "s|registry.svc.ci.openshift.org/openshift/knative-.*:knative-eventing-kafka-receive-adapter|${KNATIVE_EVENTING_KAFKA_RECEIVE_ADAPTER}|g"       ${RELEASE_YAML}
 
   cat ${RELEASE_YAML} \
   | oc apply --filename -
@@ -177,13 +194,14 @@ function run_e2e_tests(){
   local failed=0
   local channels=messaging.knative.dev/v1beta1:KafkaChannel
 
-  local common_opts=" -channels=$channels --kubeconfig $KUBECONFIG --imagetemplate $TEST_IMAGE_TEMPLATE"
+  local common_opts=" -channels=$channels --kubeconfig $KUBECONFIG"
   if [ -n "$test_name" ]; then
       local run_command="-run ^(${test_name})$"
   fi
 
   go_test_e2e -tags=e2e,source -timeout=90m -parallel=12 ./test/e2e \
     "$run_command" \
+    --imagetemplate "${TEST_IMAGE_TEMPLATE}" \
     $common_opts || failed=$?
 
   return $failed
