@@ -297,6 +297,18 @@ spec:
           namespace: knative-eventing
 ---
 apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-kafka-source-defaults
+  namespace: knative-eventing
+  labels:
+    eventing.knative.dev/release: devel
+  annotations:
+    knative.dev/example-checksum: "b6ed351d"
+data:
+  _example: |
+---
+apiVersion: v1
 kind: Service
 metadata:
   name: kafka-controller
@@ -331,7 +343,7 @@ spec:
       serviceAccountName: kafka-controller-manager
       containers:
       - name: manager
-        image: registry.ci.openshift.org/openshift/knative-v0.25.0:knative-eventing-kafka-source-controller
+        image: registry.ci.openshift.org/openshift/knative-v0.25.3:knative-eventing-kafka-source-controller
         env:
         - name: SYSTEM_NAMESPACE
           valueFrom:
@@ -344,7 +356,7 @@ spec:
         - name: CONFIG_LEADERELECTION_NAME
           value: config-leader-election
         - name: KAFKA_RA_IMAGE
-          value: registry.ci.openshift.org/openshift/knative-v0.25.0:knative-eventing-kafka-receive-adapter
+          value: registry.ci.openshift.org/openshift/knative-v0.25.3:knative-eventing-kafka-receive-adapter
         volumeMounts:
         resources:
           requests:
