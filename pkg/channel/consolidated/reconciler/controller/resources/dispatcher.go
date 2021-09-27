@@ -17,21 +17,17 @@ limitations under the License.
 package resources
 
 import (
-	"os"
-
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"knative.dev/pkg/system"
+
 	"knative.dev/eventing-kafka/pkg/common/constants"
 	commonconstants "knative.dev/eventing-kafka/pkg/common/constants"
-	"knative.dev/pkg/system"
 )
 
 const (
-	DispatcherContainerName    = "dispatcher"
-	kubeRbacProxyContainerName = "kube-rbac-proxy"
-	rbacProxyImageEnvVar       = "IMAGE_KUBE_RBAC_PROXY"
+	DispatcherContainerName = "dispatcher"
 )
 
 var (
@@ -55,7 +51,6 @@ type DispatcherArgs struct {
 	ServiceAccount      string
 	ConfigMapHash       string
 	OwnerRef            metav1.OwnerReference
-	EnableMonitoring    bool
 }
 
 // NewDispatcherBuilder returns a builder which builds from scratch a dispatcher deployment.
@@ -98,47 +93,7 @@ func (b *DispatcherBuilder) Build() *v1.Deployment {
 			}
 		}
 	}
-
-	if b.args.EnableMonitoring && len(b.deployment.Spec.Template.Spec.Containers) == 1 {
-		b.deployment.Spec.Template.Spec.Volumes = append(b.deployment.Spec.Template.Spec.Volumes, []corev1.Volume{{
-			Name: "secret-kafka-ch-dispatcher-sm-service-tls",
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: "kafka-ch-dispatcher-sm-service-tls",
-				},
-			},
-		}}...)
-		containers := b.deployment.Spec.Template.Spec.Containers
-		// Order is important here as there is an assumption elsewhere about the first container being the component one
-		b.deployment.Spec.Template.Spec.Containers = append(containers, corev1.Container{
-			Name:  kubeRbacProxyContainerName,
-			Image: getRbacProxyImage(),
-			VolumeMounts: []corev1.VolumeMount{{
-				Name:      "secret-kafka-ch-dispatcher-sm-service-tls",
-				MountPath: "/etc/tls/private",
-			}},
-			Resources: corev1.ResourceRequirements{
-				Requests: corev1.ResourceList{
-					"memory": resource.MustParse("20Mi"),
-					"cpu":    resource.MustParse("10m"),
-				}},
-			Args: []string{
-				"--secure-listen-address=0.0.0.0:8444",
-				"--upstream=http://127.0.0.1:9090/",
-				"--tls-cert-file=/etc/tls/private/tls.crt",
-				"--tls-private-key-file=/etc/tls/private/tls.key",
-				"--logtostderr=true",
-				"--v=10",
-			},
-		})
-	}
 	return b.deployment
-}
-func getRbacProxyImage() string {
-	// If it is empty let it crash to avoid issues hidden by a default value
-	// eg. passing the wrong env var name at the csv level
-	image := os.Getenv(rbacProxyImageEnvVar)
-	return image
 }
 
 func dispatcherTemplate() *v1.Deployment {
@@ -206,9 +161,6 @@ func makeEnv(args *DispatcherArgs) []corev1.EnvVar {
 	}, {
 		Name:  "CONFIG_LEADERELECTION_NAME",
 		Value: "config-leader-election",
-	}, {
-		Name:  "METRICS_PROMETHEUS_HOST",
-		Value: "127.0.0.1",
 	}}
 
 	if args.DispatcherScope == "namespace" {

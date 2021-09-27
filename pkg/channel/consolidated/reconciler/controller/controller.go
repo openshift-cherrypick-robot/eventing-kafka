@@ -19,8 +19,6 @@ package controller
 import (
 	"context"
 	"fmt"
-	"go.uber.org/atomic"
-	"knative.dev/pkg/injection"
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
@@ -47,7 +45,6 @@ import (
 	knativeReconciler "knative.dev/pkg/reconciler"
 	"knative.dev/pkg/system"
 
-	monclientv1 "github.com/prometheus-operator/prometheus-operator/pkg/client/versioned/typed/monitoring/v1"
 	"knative.dev/eventing-kafka/pkg/apis/messaging/v1beta1"
 	"knative.dev/eventing-kafka/pkg/channel/consolidated/status"
 	kafkamessagingv1beta1 "knative.dev/eventing-kafka/pkg/client/informers/externalversions/messaging/v1beta1"
@@ -94,8 +91,6 @@ func NewController(
 		endpointsLister:      endpointsInformer.Lister(),
 		serviceAccountLister: serviceAccountInformer.Lister(),
 		roleBindingLister:    roleBindingInformer.Lister(),
-		MonitoringClient:     monclientv1.NewForConfigOrDie(injection.GetConfig(ctx)),
-		enableMonitoring:     atomic.NewBool(false),
 	}
 
 	env := &envConfig{}
@@ -140,15 +135,6 @@ func NewController(
 
 	// Get and Watch the Kakfa config map and dynamically update Kafka configuration.
 	err = commonconfig.InitializeKafkaConfigMapWatcher(ctx, cmw, logger, handleKafkaConfigMapChange, system.Namespace())
-	if err != nil {
-		logger.Fatal("Failed To Initialize ConfigMap Watcher", zap.Error(err))
-	}
-
-	handleObservabilityConfigMapChange := func(ctx context.Context, configMap *corev1.ConfigMap) {
-		logger.Info("Configmap observability is updated or, it is being read for the first time")
-		r.updateMonitoringStatus(ctx, configMap)
-	}
-	err = commonconfig.InitializeObservabilityMapWatcher(ctx, cmw, logger, handleObservabilityConfigMapChange, system.Namespace())
 	if err != nil {
 		logger.Fatal("Failed To Initialize ConfigMap Watcher", zap.Error(err))
 	}

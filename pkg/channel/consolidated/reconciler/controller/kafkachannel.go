@@ -19,14 +19,10 @@ package controller
 import (
 	"context"
 	"fmt"
-	"os"
 	"strconv"
-	"strings"
 
 	"github.com/Shopify/sarama"
 	"github.com/google/go-cmp/cmp"
-	monclientv1 "github.com/prometheus-operator/prometheus-operator/pkg/client/versioned/typed/monitoring/v1"
-	"go.uber.org/atomic"
 	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -50,7 +46,6 @@ import (
 	"knative.dev/pkg/network"
 	pkgreconciler "knative.dev/pkg/reconciler"
 
-	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"knative.dev/eventing-kafka/pkg/apis/messaging/v1beta1"
 	"knative.dev/eventing-kafka/pkg/channel/consolidated/reconciler/controller/resources"
 	"knative.dev/eventing-kafka/pkg/channel/consolidated/status"
@@ -80,8 +75,6 @@ const (
 	dispatcherRoleBindingCreated    = "DispatcherRoleBindingCreated"
 
 	dispatcherName = "kafka-ch-dispatcher"
-
-	EnableMonitoringEnvVar = "ENABLE_MONITORING_BY_DEFAULT"
 )
 
 var (
@@ -142,8 +135,6 @@ type Reconciler struct {
 	roleBindingLister    rbacv1listers.RoleBindingLister
 	statusManager        status.Manager
 	controllerRef        metav1.OwnerReference
-	enableMonitoring     *atomic.Bool
-	MonitoringClient     monclientv1.MonitoringV1Interface
 }
 
 type envConfig struct {
@@ -207,7 +198,6 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, kc *v1beta1.KafkaChannel
 	// Make sure the dispatcher deployment exists and propagate the status to the Channel
 	err = r.reconcileDispatcher(ctx, scope, dispatcherNamespace, kc)
 	if err != nil {
-		logger.Errorw("Failed to reconcile the Kafka dispatcher", zap.Error(err))
 		return err
 	}
 
@@ -216,7 +206,6 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, kc *v1beta1.KafkaChannel
 	// an existence check. Then below we check the endpoints targeting it.
 	_, err = r.reconcileDispatcherService(ctx, dispatcherNamespace, kc)
 	if err != nil {
-		logger.Errorw("Failed to reconcile the Kafka dispatcher service", zap.Error(err))
 		return err
 	}
 
@@ -243,7 +232,6 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, kc *v1beta1.KafkaChannel
 	// Reconcile the k8s service representing the actual Channel. It points to the Dispatcher service via ExternalName
 	svc, err := r.reconcileChannelService(ctx, dispatcherNamespace, kc)
 	if err != nil {
-		logger.Errorw("Failed to reconcile the Channel service", zap.Error(err))
 		return err
 	}
 	kc.Status.MarkChannelServiceTrue()
@@ -321,7 +309,6 @@ func (r *Reconciler) reconcileDispatcher(ctx context.Context, scope string, disp
 			return err
 		}
 	}
-
 	args := resources.DispatcherArgs{
 		DispatcherScope:     scope,
 		DispatcherNamespace: dispatcherNamespace,
@@ -330,11 +317,6 @@ func (r *Reconciler) reconcileDispatcher(ctx context.Context, scope string, disp
 		ServiceAccount:      r.dispatcherServiceAccount,
 		ConfigMapHash:       r.kafkaConfigMapHash,
 		OwnerRef:            r.controllerRef,
-		EnableMonitoring:    r.enableMonitoring.Load(),
-	}
-	// Clean up any monitoring resources if we have to
-	if err := r.deleteServiceMonitorResources(ctx); err != nil {
-		return err
 	}
 
 	want := resources.NewDispatcherBuilder().WithArgs(&args).Build()
@@ -345,7 +327,6 @@ func (r *Reconciler) reconcileDispatcher(ctx context.Context, scope string, disp
 			if err == nil {
 				controller.GetEventRecorder(ctx).Event(kc, corev1.EventTypeNormal, dispatcherDeploymentCreated, "Dispatcher deployment created")
 				kc.Status.PropagateDispatcherStatus(&d.Status)
-				err := r.createServiceMonitorResources(ctx)
 				return err
 			} else {
 				logger.Errorw("error while creating dispatcher deployment", zap.Error(err), zap.String("namespace", dispatcherNamespace), zap.Any("deployment", want))
@@ -375,9 +356,6 @@ func (r *Reconciler) reconcileDispatcher(ctx context.Context, scope string, disp
 				return newDeploymentWarn(err)
 			} else {
 				controller.GetEventRecorder(ctx).Event(kc, corev1.EventTypeNormal, dispatcherDeploymentUpdated, "Dispatcher deployment updated")
-				if err = r.createServiceMonitorResources(ctx); err != nil {
-					return err
-				}
 			}
 		}
 		kc.Status.PropagateDispatcherStatus(&d.Status)
@@ -616,134 +594,4 @@ func (r *Reconciler) FinalizeKind(ctx context.Context, kc *v1beta1.KafkaChannel)
 		r.statusManager.CancelProbing(s)
 	}
 	return newReconciledNormal(kc.Namespace, kc.Name) //ok to remove finalizer
-}
-
-func (r *Reconciler) updateMonitoringStatus(ctx context.Context, configMap *corev1.ConfigMap) {
-	backend := configMap.Data["metrics.backend-destination"]
-	if backend == "none" || backend == "opencensus" {
-		r.enableMonitoring.Store(false)
-		return
-	}
-	var enable string
-	var present bool
-
-	enable, present = os.LookupEnv(EnableMonitoringEnvVar)
-	// Skip setup from env if feature toggle is not present, use whatever the user defines in the comp CR.
-	if !present {
-		r.enableMonitoring.Store(true)
-		return
-	}
-	parsedEnable := strings.EqualFold(enable, "true")
-	// Let the user enable monitoring with a proper backend value even if feature toggle is off.
-	if !parsedEnable && backend != "" {
-		r.enableMonitoring.Store(true)
-		return
-	}
-	r.enableMonitoring.Store(parsedEnable)
-}
-
-func (r *Reconciler) createServiceMonitorResources(ctx context.Context) error {
-	if r.enableMonitoring.Load() {
-		_, err := r.KubeClientSet.CoreV1().Services(r.systemNamespace).Create(ctx, r.getServiceMonitorService("kafka-ch-dispatcher"), metav1.CreateOptions{})
-		if err != nil && !apierrs.IsAlreadyExists(err) {
-			return err
-		}
-		_, err = r.MonitoringClient.ServiceMonitors(r.systemNamespace).Create(ctx, r.getServiceMonitor("kafka-ch-dispatcher", r.systemNamespace, "kafka-ch-dispatcher-sm-service"), metav1.CreateOptions{})
-		if err != nil && !apierrs.IsAlreadyExists(err) {
-			return err
-		}
-		_, err = r.KubeClientSet.RbacV1().ClusterRoleBindings().Create(ctx, r.getDispatcherRbacProxyClusterRolebinding(), metav1.CreateOptions{})
-		if err != nil && !apierrs.IsAlreadyExists(err) {
-			return err
-		}
-	}
-	return nil
-}
-
-func (r *Reconciler) deleteServiceMonitorResources(ctx context.Context) error {
-	if !r.enableMonitoring.Load() {
-		err := r.KubeClientSet.CoreV1().Services(r.systemNamespace).Delete(ctx, "kafka-ch-dispatcher-sm-service", metav1.DeleteOptions{})
-		if err != nil && !apierrs.IsNotFound(err) {
-			return err
-		}
-		err = r.MonitoringClient.ServiceMonitors(r.systemNamespace).Delete(ctx, "kafka-ch-dispatcher-sm", metav1.DeleteOptions{})
-		if err != nil && !apierrs.IsNotFound(err) {
-			return err
-		}
-		err = r.KubeClientSet.RbacV1().ClusterRoleBindings().Delete(ctx, "rbac-proxy-reviews-prom-rb-kafka-ch-dispatcher", metav1.DeleteOptions{})
-		if err != nil && !apierrs.IsNotFound(err) {
-			return err
-		}
-	}
-	return nil
-}
-
-func (r *Reconciler) getServiceMonitor(component string, ns string, serviceName string) *monitoringv1.ServiceMonitor {
-	return &monitoringv1.ServiceMonitor{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            fmt.Sprintf("%s-sm", component),
-			Namespace:       ns,
-			OwnerReferences: []metav1.OwnerReference{r.controllerRef},
-		},
-		Spec: monitoringv1.ServiceMonitorSpec{
-			Endpoints: []monitoringv1.Endpoint{{
-				BearerTokenFile:   "/var/run/secrets/kubernetes.io/serviceaccount/token",
-				BearerTokenSecret: corev1.SecretKeySelector{Key: ""},
-				Port:              "https",
-				Scheme:            "https",
-				TLSConfig: &monitoringv1.TLSConfig{
-					CAFile: "/etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt",
-					SafeTLSConfig: monitoringv1.SafeTLSConfig{
-						ServerName: fmt.Sprintf("%s.%s.svc", serviceName, ns),
-					},
-				},
-			},
-			},
-			NamespaceSelector: monitoringv1.NamespaceSelector{
-				MatchNames: []string{ns},
-			},
-			Selector: metav1.LabelSelector{
-				MatchLabels: map[string]string{"name": serviceName},
-			},
-		}}
-}
-
-func (r *Reconciler) getServiceMonitorService(component string) *corev1.Service {
-	serviceName := fmt.Sprintf("%s-sm-service", component)
-	return &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            serviceName,
-			Labels:          map[string]string{"name": serviceName},
-			Annotations:     map[string]string{"service.beta.openshift.io/serving-cert-secret-name": fmt.Sprintf("%s-tls", serviceName)},
-			OwnerReferences: []metav1.OwnerReference{r.controllerRef},
-		},
-		Spec: corev1.ServiceSpec{
-			Ports: []corev1.ServicePort{{
-				Name: "https",
-				Port: 8444,
-			}},
-			Selector: map[string]string{
-				"messaging.knative.dev/channel": "kafka-channel",
-				"messaging.knative.dev/role":    "dispatcher",
-			},
-		},
-	}
-}
-
-func (r *Reconciler) getDispatcherRbacProxyClusterRolebinding() *rbacv1.ClusterRoleBinding {
-	return &rbacv1.ClusterRoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "rbac-proxy-reviews-prom-rb-kafka-ch-dispatcher",
-		},
-		RoleRef: rbacv1.RoleRef{
-			APIGroup: "rbac.authorization.k8s.io",
-			Kind:     "ClusterRole",
-			Name:     "rbac-proxy-reviews-prom",
-		},
-		Subjects: []rbacv1.Subject{{
-			Kind:      "ServiceAccount",
-			Name:      "kafka-ch-dispatcher",
-			Namespace: r.systemNamespace,
-		}},
-	}
 }

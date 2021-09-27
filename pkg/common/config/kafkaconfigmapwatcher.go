@@ -26,7 +26,6 @@ import (
 	"knative.dev/eventing-kafka/pkg/common/constants"
 	kubeclient "knative.dev/pkg/client/injection/kube/client"
 	"knative.dev/pkg/configmap"
-	"knative.dev/pkg/metrics"
 )
 
 // This function type is for a shim so that we can pass our own logger to the Observer function
@@ -43,18 +42,6 @@ func InitializeKafkaConfigMapWatcher(ctx context.Context, watcher configmap.Watc
 		watcher.Watch(constants.SettingsConfigMapName, func(configmap *corev1.ConfigMap) { handler(ctx, configmap) })
 	} else if !apierrors.IsNotFound(err) {
 		logger.Error("Error reading ConfigMap "+constants.SettingsConfigMapName, zap.Error(err))
-		return err
-	}
-
-	return nil
-}
-
-func InitializeObservabilityMapWatcher(ctx context.Context, watcher configmap.Watcher, logger *zap.SugaredLogger, handler LoggingObserver, namespace string) error {
-	cm := metrics.ConfigMapName()
-	if _, err := kubeclient.Get(ctx).CoreV1().ConfigMaps(namespace).Get(ctx, cm, metav1.GetOptions{}); err == nil {
-		watcher.Watch(cm, func(configmap *corev1.ConfigMap) { handler(ctx, configmap) })
-	} else if !apierrors.IsNotFound(err) {
-		logger.Error("Error reading ConfigMap "+cm, zap.Error(err))
 		return err
 	}
 

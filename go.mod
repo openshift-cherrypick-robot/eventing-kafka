@@ -19,8 +19,6 @@ require (
 	github.com/influxdata/tdigest v0.0.1 // indirect
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/mitchellh/mapstructure v1.3.3 // indirect
-	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.49.0
-	github.com/prometheus-operator/prometheus-operator/pkg/client v0.49.0
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475
 	github.com/slinkydeveloper/loadastic v0.0.0-20201218203601-5c69eea3b7d8
 	github.com/stretchr/testify v1.7.0
