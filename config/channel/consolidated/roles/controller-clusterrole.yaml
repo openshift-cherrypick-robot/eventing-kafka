@@ -58,6 +58,7 @@ rules:
       - create
       - patch
       - update
+      - delete
   - apiGroups:
       - "" # Core API Group.
     resources:
@@ -93,6 +94,16 @@ rules:
       - rbac.authorization.k8s.io
     resources:
       - rolebindings
+    verbs: *everything
+  - apiGroups:
+      - rbac.authorization.k8s.io
+    resources:
+      - clusterrolebindings
+    verbs: *everything
+  - apiGroups:
+      - monitoring.coreos.com
+    resources:
+      - servicemonitors
     verbs: *everything
   - apiGroups:
       - "coordination.k8s.io"

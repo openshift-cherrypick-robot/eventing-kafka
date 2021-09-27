@@ -22,11 +22,14 @@ import (
 	"testing"
 
 	"github.com/Shopify/sarama"
+	"go.uber.org/atomic"
 	"go.uber.org/zap"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/scheme"
 	clientgotesting "k8s.io/client-go/testing"
 	"knative.dev/eventing-kafka/pkg/common/config"
@@ -40,6 +43,7 @@ import (
 	"knative.dev/pkg/network"
 	. "knative.dev/pkg/reconciler/testing"
 
+	monclientv1fake "github.com/prometheus-operator/prometheus-operator/pkg/client/versioned/fake"
 	"knative.dev/eventing-kafka/pkg/apis/messaging/v1beta1"
 	"knative.dev/eventing-kafka/pkg/channel/consolidated/reconciler/controller/resources"
 	reconcilertesting "knative.dev/eventing-kafka/pkg/channel/consolidated/reconciler/testing"
@@ -126,6 +130,10 @@ func TestAllCases(t *testing.T) {
 				Eventf(corev1.EventTypeNormal, dispatcherServiceCreated, "Dispatcher service created"),
 				Eventf(corev1.EventTypeWarning, "InternalError", `endpoints "kafka-ch-dispatcher" not found`),
 			},
+			WantDeletes: []clientgotesting.DeleteActionImpl{
+				deleteMonitoringAction(testNS, "kafka-ch-dispatcher-sm-service"),
+				deleteClusterRolebindingAction("rbac-proxy-reviews-prom-rb-kafka-ch-dispatcher"),
+			},
 		}, {
 			Name: "Service does not exist, automatically created",
 			Key:  kcKey,
@@ -152,6 +160,10 @@ func TestAllCases(t *testing.T) {
 				Eventf(corev1.EventTypeNormal, dispatcherServiceCreated, "Dispatcher service created"),
 				Eventf(corev1.EventTypeWarning, "InternalError", `endpoints "kafka-ch-dispatcher" not found`),
 			},
+			WantDeletes: []clientgotesting.DeleteActionImpl{
+				deleteMonitoringAction(testNS, "kafka-ch-dispatcher-sm-service"),
+				deleteClusterRolebindingAction("rbac-proxy-reviews-prom-rb-kafka-ch-dispatcher"),
+			},
 		}, {
 			Name: "Endpoints does not exist",
 			Key:  kcKey,
@@ -175,6 +187,10 @@ func TestAllCases(t *testing.T) {
 			}},
 			WantEvents: []string{
 				Eventf(corev1.EventTypeWarning, "InternalError", `endpoints "kafka-ch-dispatcher" not found`),
+			},
+			WantDeletes: []clientgotesting.DeleteActionImpl{
+				deleteMonitoringAction(testNS, "kafka-ch-dispatcher-sm-service"),
+				deleteClusterRolebindingAction("rbac-proxy-reviews-prom-rb-kafka-ch-dispatcher"),
 			},
 		}, {
 			Name: "Endpoints not ready",
@@ -200,6 +216,10 @@ func TestAllCases(t *testing.T) {
 			}},
 			WantEvents: []string{
 				Eventf(corev1.EventTypeWarning, "InternalError", `there are no endpoints ready for Dispatcher service kafka-ch-dispatcher`),
+			},
+			WantDeletes: []clientgotesting.DeleteActionImpl{
+				deleteMonitoringAction(testNS, "kafka-ch-dispatcher-sm-service"),
+				deleteClusterRolebindingAction("rbac-proxy-reviews-prom-rb-kafka-ch-dispatcher"),
 			},
 		}, {
 			Name: "Works, creates new channel",
@@ -230,6 +250,10 @@ func TestAllCases(t *testing.T) {
 			}},
 			WantEvents: []string{
 				Eventf(corev1.EventTypeNormal, "KafkaChannelReconciled", `KafkaChannel reconciled: "test-namespace/test-kc"`),
+			},
+			WantDeletes: []clientgotesting.DeleteActionImpl{
+				deleteMonitoringAction(testNS, "kafka-ch-dispatcher-sm-service"),
+				deleteClusterRolebindingAction("rbac-proxy-reviews-prom-rb-kafka-ch-dispatcher"),
 			},
 		}, {
 			Name: "Works, channel exists",
@@ -264,6 +288,10 @@ func TestAllCases(t *testing.T) {
 			WantPatches: []clientgotesting.PatchActionImpl{
 				makePatch(testNS, kcName, twoSubscribersPatch),
 			},
+			WantDeletes: []clientgotesting.DeleteActionImpl{
+				deleteMonitoringAction(testNS, "kafka-ch-dispatcher-sm-service"),
+				deleteClusterRolebindingAction("rbac-proxy-reviews-prom-rb-kafka-ch-dispatcher"),
+			},
 		}, {
 			Name: "channel exists, not owned by us",
 			Key:  kcKey,
@@ -290,6 +318,10 @@ func TestAllCases(t *testing.T) {
 			}},
 			WantEvents: []string{
 				Eventf(corev1.EventTypeWarning, "InternalError", `kafkachannel: test-namespace/test-kc does not own Service: "test-kc-kn-channel"`),
+			},
+			WantDeletes: []clientgotesting.DeleteActionImpl{
+				deleteMonitoringAction(testNS, "kafka-ch-dispatcher-sm-service"),
+				deleteClusterRolebindingAction("rbac-proxy-reviews-prom-rb-kafka-ch-dispatcher"),
 			},
 		}, {
 			Name: "channel does not exist, fails to create",
@@ -323,6 +355,10 @@ func TestAllCases(t *testing.T) {
 			WantEvents: []string{
 				Eventf(corev1.EventTypeWarning, "InternalError", "inducing failure for create services"),
 			},
+			WantDeletes: []clientgotesting.DeleteActionImpl{
+				deleteMonitoringAction(testNS, "kafka-ch-dispatcher-sm-service"),
+				deleteClusterRolebindingAction("rbac-proxy-reviews-prom-rb-kafka-ch-dispatcher"),
+			},
 			// TODO add UTs for topic creation and deletion.
 		},
 	}
@@ -354,6 +390,8 @@ func TestAllCases(t *testing.T) {
 					return true, nil
 				},
 			},
+			MonitoringClient: monclientv1fake.NewSimpleClientset().MonitoringV1(),
+			enableMonitoring: atomic.NewBool(false),
 		}
 		return kafkachannel.NewReconciler(ctx, logging.FromContext(ctx), r.kafkaClientSet, listers.GetKafkaChannelLister(), controller.GetEventRecorder(ctx), r)
 	}, zap.L()))
@@ -390,6 +428,10 @@ func TestTopicExists(t *testing.T) {
 		}},
 		WantEvents: []string{
 			Eventf(corev1.EventTypeNormal, "KafkaChannelReconciled", `KafkaChannel reconciled: "test-namespace/test-kc"`),
+		},
+		WantDeletes: []clientgotesting.DeleteActionImpl{
+			deleteMonitoringAction(testNS, "kafka-ch-dispatcher-sm-service"),
+			deleteClusterRolebindingAction("rbac-proxy-reviews-prom-rb-kafka-ch-dispatcher"),
 		},
 	}
 
@@ -428,6 +470,8 @@ func TestTopicExists(t *testing.T) {
 					return true, nil
 				},
 			},
+			MonitoringClient: monclientv1fake.NewSimpleClientset().MonitoringV1(),
+			enableMonitoring: atomic.NewBool(false),
 		}
 		return kafkachannel.NewReconciler(ctx, logging.FromContext(ctx), r.kafkaClientSet, listers.GetKafkaChannelLister(), controller.GetEventRecorder(ctx), r)
 	}, zap.L()))
@@ -469,6 +513,10 @@ func TestDeploymentUpdatedOnImageChange(t *testing.T) {
 			Eventf(corev1.EventTypeNormal, dispatcherDeploymentUpdated, "Dispatcher deployment updated"),
 			Eventf(corev1.EventTypeNormal, "KafkaChannelReconciled", `KafkaChannel reconciled: "test-namespace/test-kc"`),
 		},
+		WantDeletes: []clientgotesting.DeleteActionImpl{
+			deleteMonitoringAction(testNS, "kafka-ch-dispatcher-sm-service"),
+			deleteClusterRolebindingAction("rbac-proxy-reviews-prom-rb-kafka-ch-dispatcher"),
+		},
 	}
 
 	row.Test(t, reconcilertesting.MakeFactory(func(ctx context.Context, listers *reconcilertesting.Listers, cmw configmap.Watcher) controller.Reconciler {
@@ -506,6 +554,8 @@ func TestDeploymentUpdatedOnImageChange(t *testing.T) {
 					return true, nil
 				},
 			},
+			MonitoringClient: monclientv1fake.NewSimpleClientset().MonitoringV1(),
+			enableMonitoring: atomic.NewBool(false),
 		}
 		return kafkachannel.NewReconciler(ctx, logging.FromContext(ctx), r.kafkaClientSet, listers.GetKafkaChannelLister(), controller.GetEventRecorder(ctx), r)
 	}, zap.L()))
@@ -547,6 +597,10 @@ func TestDeploymentZeroReplicas(t *testing.T) {
 			Eventf(corev1.EventTypeNormal, dispatcherDeploymentUpdated, "Dispatcher deployment updated"),
 			Eventf(corev1.EventTypeNormal, "KafkaChannelReconciled", `KafkaChannel reconciled: "test-namespace/test-kc"`),
 		},
+		WantDeletes: []clientgotesting.DeleteActionImpl{
+			deleteMonitoringAction(testNS, "kafka-ch-dispatcher-sm-service"),
+			deleteClusterRolebindingAction("rbac-proxy-reviews-prom-rb-kafka-ch-dispatcher"),
+		},
 	}
 
 	row.Test(t, reconcilertesting.MakeFactory(func(ctx context.Context, listers *reconcilertesting.Listers, cmw configmap.Watcher) controller.Reconciler {
@@ -584,6 +638,8 @@ func TestDeploymentZeroReplicas(t *testing.T) {
 					return true, nil
 				},
 			},
+			MonitoringClient: monclientv1fake.NewSimpleClientset().MonitoringV1(),
+			enableMonitoring: atomic.NewBool(false),
 		}
 		return kafkachannel.NewReconciler(ctx, logging.FromContext(ctx), r.kafkaClientSet, listers.GetKafkaChannelLister(), controller.GetEventRecorder(ctx), r)
 	}, zap.L()))
@@ -621,6 +677,10 @@ func TestDeploymentMoreThanOneReplicas(t *testing.T) {
 		WantEvents: []string{
 			Eventf(corev1.EventTypeNormal, "KafkaChannelReconciled", `KafkaChannel reconciled: "test-namespace/test-kc"`),
 		},
+		WantDeletes: []clientgotesting.DeleteActionImpl{
+			deleteMonitoringAction(testNS, "kafka-ch-dispatcher-sm-service"),
+			deleteClusterRolebindingAction("rbac-proxy-reviews-prom-rb-kafka-ch-dispatcher"),
+		},
 	}
 
 	row.Test(t, reconcilertesting.MakeFactory(func(ctx context.Context, listers *reconcilertesting.Listers, cmw configmap.Watcher) controller.Reconciler {
@@ -658,6 +718,8 @@ func TestDeploymentMoreThanOneReplicas(t *testing.T) {
 					return true, nil
 				},
 			},
+			MonitoringClient: monclientv1fake.NewSimpleClientset().MonitoringV1(),
+			enableMonitoring: atomic.NewBool(false),
 		}
 		return kafkachannel.NewReconciler(ctx, logging.FromContext(ctx), r.kafkaClientSet, listers.GetKafkaChannelLister(), controller.GetEventRecorder(ctx), r)
 	}, zap.L()))
@@ -699,6 +761,10 @@ func TestDeploymentUpdatedOnConfigMapHashChange(t *testing.T) {
 			Eventf(corev1.EventTypeNormal, dispatcherDeploymentUpdated, "Dispatcher deployment updated"),
 			Eventf(corev1.EventTypeNormal, "KafkaChannelReconciled", `KafkaChannel reconciled: "test-namespace/test-kc"`),
 		},
+		WantDeletes: []clientgotesting.DeleteActionImpl{
+			deleteMonitoringAction(testNS, "kafka-ch-dispatcher-sm-service"),
+			deleteClusterRolebindingAction("rbac-proxy-reviews-prom-rb-kafka-ch-dispatcher"),
+		},
 	}
 
 	row.Test(t, reconcilertesting.MakeFactory(func(ctx context.Context, listers *reconcilertesting.Listers, cmw configmap.Watcher) controller.Reconciler {
@@ -736,6 +802,8 @@ func TestDeploymentUpdatedOnConfigMapHashChange(t *testing.T) {
 					return true, nil
 				},
 			},
+			MonitoringClient: monclientv1fake.NewSimpleClientset().MonitoringV1(),
+			enableMonitoring: atomic.NewBool(false),
 		}
 		return kafkachannel.NewReconciler(ctx, logging.FromContext(ctx), r.kafkaClientSet, listers.GetKafkaChannelLister(), controller.GetEventRecorder(ctx), r)
 	}, zap.L()))
@@ -955,6 +1023,27 @@ func patchFinalizers(namespace, name string) clientgotesting.PatchActionImpl {
 	return action
 }
 
+func deleteMonitoringAction(namespace, name string) clientgotesting.DeleteActionImpl {
+	return clientgotesting.DeleteActionImpl{
+		ActionImpl: clientgotesting.ActionImpl{
+			Namespace:   namespace,
+			Verb:        "delete",
+			Resource:    schema.GroupVersionResource{Group: corev1.SchemeGroupVersion.Group, Version: corev1.SchemeGroupVersion.Version, Resource: "services"},
+			Subresource: "",
+		},
+		Name: name,
+	}
+}
+func deleteClusterRolebindingAction(name string) clientgotesting.DeleteActionImpl {
+	return clientgotesting.DeleteActionImpl{
+		ActionImpl: clientgotesting.ActionImpl{
+			Namespace: "",
+			Verb:      "delete",
+			Resource:  schema.GroupVersionResource{Group: rbacv1.SchemeGroupVersion.Group, Version: rbacv1.SchemeGroupVersion.Version, Resource: "clusterrolebindings"},
+		},
+		Name: name,
+	}
+}
 func subscribers() []eventingduckv1.SubscriberSpec {
 
 	return []eventingduckv1.SubscriberSpec{{
