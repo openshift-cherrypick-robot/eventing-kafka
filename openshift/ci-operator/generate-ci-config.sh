@@ -70,7 +70,7 @@ binary_build_commands: make install
 test_binary_build_commands: make test-install
 tests:
 EOF
-if [[ "$openshift" == "4.8" ]]; then
+if [[ "$openshift" != "4.7" ]]; then
 cat <<EOF
 - as: e2e-aws-ocp-${openshift//./}
   cluster_claim:
