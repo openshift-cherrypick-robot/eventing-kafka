@@ -3,9 +3,13 @@
 branch=${1-'knative-v0.19.1'}
 openshift=${2-'4.6'}
 promotion_disabled=${3-false}
+generate_continuous=true
 
 if [[ "$branch" == "knative-next" ]]; then
-    branch="knative-nightly"
+  promotion_name="knative-nightly"
+  generate_continuous=false
+else
+  promotion_name="$branch.0"
 fi
 
 core_images=$(find ./openshift/ci-operator/knative-images -mindepth 1 -maxdepth 1 -type d | LC_COLLATE=posix sort)
@@ -46,7 +50,7 @@ promotion:
   disabled: $promotion_disabled
   cluster: https://api.ci.openshift.org
   namespace: openshift
-  name: $branch.0
+  name: $promotion_name
 releases:
   initial:
     integration:
@@ -70,7 +74,7 @@ binary_build_commands: make install
 test_binary_build_commands: make test-install
 tests:
 EOF
-if [[ "$openshift" == "4.8" ]]; then
+if [[ "$openshift" != "4.7" ]]; then
 cat <<EOF
 - as: e2e-aws-ocp-${openshift//./}
   cluster_claim:
@@ -79,7 +83,7 @@ cat <<EOF
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.8"
+    version: "$openshift"
   steps:
     test:
     - as: test
@@ -93,6 +97,9 @@ $image_deps
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
+EOF
+  if [[ "$generate_continuous" == true ]]; then
+    cat <<EOF
 - as: e2e-aws-ocp-${openshift//./}-continuous
   cluster_claim:
     architecture: amd64
@@ -116,6 +123,7 @@ $image_deps
       timeout: 4h0m0s
     workflow: generic-claim
 EOF
+  fi
 else
 cat <<EOF
 - as: e2e-aws-ocp-${openshift//./}
@@ -132,6 +140,9 @@ $image_deps
         requests:
           cpu: 100m
     workflow: ipi-aws
+EOF
+  if [[ "$generate_continuous" == true ]]; then
+    cat <<EOF
 - as: e2e-aws-ocp-${openshift//./}-continuous
   cron: 0 */12 * * 1-5
   steps:
@@ -148,6 +159,7 @@ $image_deps
           cpu: 100m
     workflow: ipi-aws
 EOF
+  fi
 fi
 cat <<EOF
 resources:
