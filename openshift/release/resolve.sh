@@ -30,6 +30,7 @@ function resolve_resources(){
         -e "s+knative.dev/eventing-kafka/cmd/channel/distributed/controller+${image_prefix}distributed-controller${image_tag}+" \
         -e "s+knative.dev/eventing-kafka/cmd/channel/distributed/receiver+${image_prefix}receiver${image_tag}+" \
         -e "s+knative.dev/eventing-kafka/cmd/channel/distributed/dispatcher+${image_prefix}distributed-dispatcher${image_tag}+" \
+        -e "s+knative.dev/eventing-kafka/vendor/knative.dev/pkg/apiextensions/storageversion/cmd/migrate+${image_prefix}migrate${image_tag}+" \
         -e "s+\(.* image: \)\(knative.dev\)\(.*/\)\(.*\)+\1${image_prefix}\4${image_tag}+g" \
         -e '/^[ \t]*#/d' \
         -e '/^[ \t]*$/d' \
