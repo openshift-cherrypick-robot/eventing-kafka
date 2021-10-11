@@ -26,6 +26,7 @@ install:
 	go build -o $(GOPATH)/bin/consolidated_dispatcher ./cmd/channel/consolidated/dispatcher/
 	go build -o $(GOPATH)/bin/distributed_controller ./cmd/channel/distributed/controller/
 	go build -o $(GOPATH)/bin/distributed_dispatcher ./cmd/channel/distributed/dispatcher/
+	go build -o $(GOPATH)/bin/migrate $(MIGRATE_IMAGE)
 .PHONY: install
 
 test-install:
