@@ -39,6 +39,7 @@ PERIODIC_CONFIG=$PERIODIC_CONFIGDIR/openshift-knative-eventing-kafka-release-$VE
 CURDIR=$(dirname $0)
 $CURDIR/generate-ci-config.sh knative-$VERSION 4.7 > ${CONFIG}__47.yaml
 $CURDIR/generate-ci-config.sh knative-$VERSION 4.8 true > ${CONFIG}__48.yaml
+$CURDIR/generate-ci-config.sh knative-$VERSION 4.9 true > ${CONFIG}__49.yaml
 
 # Switch to openshift/release to generate PROW files
 cd $OPENSHIFT
