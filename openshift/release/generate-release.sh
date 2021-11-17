@@ -8,7 +8,6 @@ source_output_file="openshift/release/knative-eventing-kafka-source-ci.yaml"
 source_postinstall_output_file="openshift/release/knative-eventing-kafka-source-postinstall-ci.yaml"
 channel_output_file="openshift/release/knative-eventing-kafka-channel-ci.yaml"
 channel_postinstall_file="openshift/release/knative-eventing-kafka-channel-postinstall-ci.yaml"
-distributed_channel_output_file="openshift/release/knative-eventing-kafka-distributed-channel-ci.yaml"
 
 if [ "$release" == "ci" ]; then
     image_prefix="registry.ci.openshift.org/openshift/knative-nightly:knative-eventing-kafka-"
@@ -25,6 +24,3 @@ resolve_resources config/source/post-install $source_postinstall_output_file $im
 # the channel parts
 resolve_resources config/channel/consolidated $channel_output_file $image_prefix $tag
 resolve_resources config/channel/post-install $channel_postinstall_file $image_prefix $tag
-
-# the distributed channel parts
-resolve_resources config/channel/distributed $distributed_channel_output_file $image_prefix $tag
