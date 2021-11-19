@@ -18,7 +18,7 @@ git checkout upstream/main -B ${REPO_BRANCH}
 
 # Update openshift's main and take all needed files from there.
 git fetch openshift main
-git checkout openshift/main openshift OWNERS Makefile
+git checkout openshift/main openshift OWNERS OWNERS_ALIASES Makefile
 
 # Remove GH Action hooks from upstream
 rm -rf .github/workflows
@@ -27,7 +27,7 @@ git commit -sm ":fire: remove unneeded workflows" .github/
 # Generate our OCP artifacts
 make generate-dockerfiles
 make RELEASE=ci generate-release
-git add openshift OWNERS Makefile
+git add openshift OWNERS OWNERS_ALIASES Makefile
 git commit -m ":open_file_folder: Update openshift specific files."
 
 # Apply patches if present
