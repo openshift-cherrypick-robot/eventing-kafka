@@ -27,8 +27,12 @@ git commit -m "Add openshift specific files."
 
 # Apply patches if present
 PATCHES_DIR="$(pwd)/openshift/patches/"
+# Use release-specific patch dir if exists
+if [ -d "$(pwd)/openshift/patches-${release}" ]; then
+    PATCHES_DIR="$(pwd)/openshift/patches-${release}"
+fi
 if [ -d "$PATCHES_DIR" ] && [ "$(ls -A "$PATCHES_DIR")" ]; then
-    git apply openshift/patches/*
+    git apply $PATCHES_DIR/*
     make RELEASE=$release generate-release
     git commit -am ":fire: Apply carried patches."
 fi
