@@ -5,7 +5,7 @@ index 71c29179a..f0b89cd1a 100644
 @@ -47,7 +47,7 @@ const (
  	strimziTopicResource = "kafkatopics"
  	interval             = 3 * time.Second
- 	timeout              = 30 * time.Second
+	timeout              = 4 * time.Minute
 -	kafkaCatImage        = "docker.io/edenhill/kafkacat:1.6.0"
 +	kafkaCatImage        = "quay.io/openshift-knative/kafkacat:1.6.0"
  )
