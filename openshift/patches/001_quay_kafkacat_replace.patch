@@ -1,11 +1,11 @@
 diff --git a/test/e2e/helpers/kafka_helper.go b/test/e2e/helpers/kafka_helper.go
-index 71c29179a..f0b89cd1a 100644
+index f48c57081..9c750aba7 100644
 --- a/test/e2e/helpers/kafka_helper.go
 +++ b/test/e2e/helpers/kafka_helper.go
-@@ -47,7 +47,7 @@ const (
+@@ -51,7 +51,7 @@ const (
  	strimziTopicResource = "kafkatopics"
  	interval             = 3 * time.Second
-	timeout              = 4 * time.Minute
+ 	timeout              = 4 * time.Minute
 -	kafkaCatImage        = "docker.io/edenhill/kafkacat:1.6.0"
 +	kafkaCatImage        = "quay.io/openshift-knative/kafkacat:1.6.0"
  )
