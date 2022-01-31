@@ -234,26 +234,32 @@ function install_serverless_operator_custom() {
 ################################################################################
 # Install serverless operator with the suitable eventing version
 #
-# This function will check if there's a matching eventing version provided by
+# By default, this function will check if there's a matching eventing version provided by
 # serverless operator and if not (e.g release-next is always ahead of serverless
 # operator) it will install the matching eventing version from midstream
-# eventing.
+# eventing. You can enforce using Serverless Operator eventing by passing false.
 # Globals:
 #   None
 # Arguments:
-#   None
+#   1: Use midstream eventing if serverless operator doesn't provide needed
+#      version. (default is true).
 ################################################################################
 function install_serverless(){
-  # Check if the same version of eventing is available via the serverless operator
-  local so_branch=$(find_matching_so_release_branch)
+  local fallback_to_midstream=${1:-true}
+  local so_branch="main"
   local so_skip_eventing="false"
-  if [[ "$so_branch" == "0" ]]; then
-    install_midstream_eventing || return 1
-    so_branch="main"
-    so_skip_eventing="true"
+  if [[ "$fallback_to_midstream" == "true" ]]; then
+    # Check if the same version of eventing is available via the serverless operator
+    local found_branch=$(find_matching_so_release_branch)
+    if [[ "$found_branch" == "0" ]]; then
+      install_midstream_eventing || return 1
+      found_branch="main"
+      so_skip_eventing="true"
+    fi
+    so_branch="$found_branch"
   fi
 
-  install_serverless_operator_custom $so_branch $so_skip_eventing || return 1
+  install_serverless_operator_custom "$so_branch" "$so_skip_eventing" || return 1
 }
 
 function install_knative_kafka {
