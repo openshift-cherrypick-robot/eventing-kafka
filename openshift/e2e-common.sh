@@ -11,6 +11,10 @@ export KAFKA_INSTALLATION_CONFIG="test/config/100-kafka-ephemeral-triple-3.0.0.y
 export KAFKA_USERS_CONFIG="test/config/100-strimzi-users.yaml"
 export KAFKA_PLAIN_CLUSTER_URL="my-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"
 readonly KNATIVE_EVENTING_MONITORING_YAML="test/config/monitoring.yaml"
+readonly SO_REPO="https://github.com/openshift-knative/serverless-operator.git"
+readonly EVENTING_REPO="https://github.com/openshift/knative-eventing.git"
+readonly SO_OLM_PROJECT="https://raw.githubusercontent.com/openshift-knative/serverless-operator/main/olm-catalog/serverless-operator/project.yaml"
+readonly CURRENT_MODULE="eventing_kafka"
 KAFKA_CLUSTER_URL=${KAFKA_PLAIN_CLUSTER_URL}
 export EVENTING_KAFKA_TEST_IMAGE_TEMPLATE=$(cat <<-END
 {{- with .Name }}
@@ -96,20 +100,160 @@ function install_strimzi(){
   oc apply -f "${KAFKA_USERS_CONFIG}" -n kafka || return 1
 }
 
-function install_serverless(){
-  header "Installing Serverless Operator"
+################################################################################
+# Simple function to do arithmetic calculation using AWK
+#
+# Globals:
+#   None
+# Arguments:
+#   *: Arithmetic expression to calculate (e.g. 3 + 5 , 8/2)
+# Output:
+#   Writes the calculated value to stdout
+################################################################################
+function calc() {
+    awk "BEGIN { print $*; }"
+}
+
+################################################################################
+# Install eventing from midstream repo the matches the current branch
+#
+# The current branch name should match the midstream eventing branch used.
+# Globals:
+#   EVENTING_REPO
+#   EVENTING_NAMESPACE
+# Arguments:
+#   None
+################################################################################
+function install_midstream_eventing() {
+  local branch=$(git rev-parse --abbrev-ref HEAD)
+  header "Installing Knative Eventing from ${branch}"
+  local eventing_dir=/tmp/eventing-operator
+  local failed=0
+  git clone --branch $branch $EVENTING_REPO $eventing_dir || return 1
+  pushd $eventing_dir || return 1
+
+  cat openshift/release/knative-eventing-ci.yaml > ci
+  cat openshift/release/knative-eventing-mtbroker-ci.yaml >> ci
+
+  oc apply -f ci || return 1
+  rm ci
+
+  # Wait for 5 pods to appear first
+  timeout 900 '[[ $(oc get pods -n $EVENTING_NAMESPACE --no-headers | wc -l) -lt 5 ]]' || return 1
+  wait_until_pods_running $EVENTING_NAMESPACE || return 1
+
+  popd || return 1
+  return $failed
+}
+
+################################################################################
+# Calculate the serverless operator release which corresponds to the given
+# eventing version regardless of whether that release exists or not.
+#
+# e.g eventing 0.25 -> 1.19, eventing 1.0 -> 1.21, eventing 1.2 -> 1.23.
+# Globals:
+#   None
+# Arguments:
+#   1: Eventing version number. E.g. 0.26 or 1.2
+# Outputs:
+#   Writes the calculated release version to stdout
+################################################################################
+function calculate_so_release() {
+    version=$1
+    if [[ "$version" < 1 ]];then
+        printf "%.2f\n" "$(calc $version + 0.94)"
+    elif [[ "$version" == "1.0" ]];then
+        echo 1.21
+    else
+       printf "%.2f\n" "$(calc "$version" / 10 + "1.11")"
+    fi
+}
+
+################################################################################
+# Find the serverless operator branch which provides the eventing version that
+# matches the current branch version whether it's a release branch or main.
+#
+# Globals:
+#   SO_REPO
+# Arguments:
+#   None
+# Outputs:
+#   Writes the branch name to stdout or 0 if none was found.
+################################################################################
+function find_matching_so_release_branch(){
+  local current_branch=$(git rev-parse --abbrev-ref HEAD)
+  if [[ $current_branch == release-v* ]]; then
+    version=$(echo "$current_branch"|cut -dv -f2)
+    so_version=$(calculate_so_release "$version")
+    if git ls-remote -h $SO_REPO | grep -F "release-$so_version" ; then
+      echo "${so_version}"
+      return 1
+    else
+      # There's no matching SO version. Let's see if main is a good candidate.
+      # We will search SO main branch's olm-catalog/serverless-operator/project.yaml file
+      if curl -s $SO_OLM_PROJECT | grep -q "${CURRENT_MODULE}:\s*${version}" ; then
+        echo "main"
+        return 1
+      fi
+    fi
+  fi
+  echo 0
+}
+
+################################################################################
+# Install serverless operator from given branch and optionally skip eventing
+# installation.
+# Globals:
+#   SO_REPO
+# Arguments:
+#   1: Branch name to install from
+#   2: Skip installing eventing from serverless operator. Default is false.
+################################################################################
+function install_serverless_operator_custom() {
+  local so_branch=$1
+  local skip_eventing=${2:-false}
+  local so_install_cmd="./hack/install.sh"
+  if [[ "$skip_eventing" == "true" ]]; then
+    so_install_cmd='INSTALL_EVENTING="false" ./hack/install.sh'
+  fi
+  header "Installing Serverless Operator from ${so_branch}"
   local operator_dir=/tmp/serverless-operator
   local failed=0
-  git clone --branch main https://github.com/openshift-knative/serverless-operator.git $operator_dir || return 1
+  git clone --branch $so_branch $SO_REPO $operator_dir || return 1
   # unset OPENSHIFT_BUILD_NAMESPACE (old CI) and OPENSHIFT_CI (new CI) as its used in serverless-operator's CI
   # environment as a switch to use CI built images, we want pre-built images of k-s-o and k-o-i
   unset OPENSHIFT_BUILD_NAMESPACE
   unset OPENSHIFT_CI
   pushd $operator_dir
 
-  ./hack/install.sh && header "Serverless Operator installed successfully" || failed=1
+  eval $so_install_cmd && header "Serverless Operator installed successfully" || failed=1
   popd
   return $failed
+}
+
+################################################################################
+# Install serverless operator with the suitable eventing version
+#
+# This function will check if there's a matching eventing version provided by
+# serverless operator and if not (e.g release-next is always ahead of serverless
+# operator) it will install the matching eventing version from midstream
+# eventing.
+# Globals:
+#   None
+# Arguments:
+#   None
+################################################################################
+function install_serverless(){
+  # Check if the same version of eventing is available via the serverless operator
+  local so_branch=$(find_matching_so_release_branch)
+  local so_skip_eventing="false"
+  if [[ "$so_branch" == "0" ]]; then
+    install_midstream_eventing || return 1
+    so_branch="main"
+    so_skip_eventing="true"
+  fi
+
+  install_serverless_operator_custom $so_branch $so_skip_eventing || return 1
 }
 
 function install_knative_kafka {
@@ -206,3 +350,5 @@ function run_e2e_tests(){
 
   return $failed
 }
+
+find_matching_so_release_branch
