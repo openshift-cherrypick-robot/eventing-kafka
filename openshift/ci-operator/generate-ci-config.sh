@@ -98,6 +98,32 @@ $image_deps
       timeout: 4h0m0s
     workflow: generic-claim
 EOF
+  if [[ "$openshift" == "4.9" ]]; then
+    cat <<EOF
+- as: so-compat-aws-ocp-${openshift//./}
+  optional: true
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "$openshift"
+  steps:
+    test:
+    - as: test
+      cli: latest
+      commands: make test-so-forward-compat
+      dependencies:
+$image_deps
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: generic-claim
+EOF
+  fi
   if [[ "$generate_continuous" == true ]]; then
     cat <<EOF
 - as: e2e-aws-ocp-${openshift//./}-continuous
