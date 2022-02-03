@@ -100,7 +100,7 @@ $image_deps
 EOF
   if [[ "$openshift" == "4.9" ]]; then
     cat <<EOF
-- as: so-compat-aws-ocp-${openshift//./}
+- as: so-forward-compatibility-ocp-${openshift//./}
   optional: true
   cluster_claim:
     architecture: amd64
