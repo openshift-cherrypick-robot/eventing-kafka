@@ -14,6 +14,7 @@ fi
 
 core_images=$(find ./openshift/ci-operator/knative-images -mindepth 1 -maxdepth 1 -type d | LC_COLLATE=posix sort)
 test_images=$(find ./openshift/ci-operator/knative-test-images -mindepth 1 -maxdepth 1 -type d | LC_COLLATE=posix sort)
+
 function print_image_dependencies {
   for img in $core_images; do
     image_base=knative-eventing-kafka-$(basename $img)
@@ -39,33 +40,6 @@ EOF
         name: $to_image
 EOF
   done
-}
-
-function print_promotion {
-  cat <<EOF
-promotion:
-  additional_images:
-    knative-eventing-kafka-src: src
-  disabled: $promotion_disabled
-  cluster: https://api.ci.openshift.org
-  namespace: openshift
-  name: $promotion_name
-EOF
-}
-
-function print_releases {
-  cat <<EOF
-releases:
-  initial:
-    integration:
-      name: "$openshift"
-      namespace: ocp
-  latest:
-    integration:
-      include_built_images: true
-      name: "$openshift"
-      namespace: ocp
-EOF
 }
 
 function print_base_images {
@@ -203,6 +177,33 @@ $image_deps
     workflow: ipi-aws
 EOF
   fi
+}
+
+function print_releases {
+  cat <<EOF
+releases:
+  initial:
+    integration:
+      name: "$openshift"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "$openshift"
+      namespace: ocp
+EOF
+}
+
+function print_promotion {
+  cat <<EOF
+promotion:
+  additional_images:
+    knative-eventing-kafka-src: src
+  disabled: $promotion_disabled
+  cluster: https://api.ci.openshift.org
+  namespace: openshift
+  name: $promotion_name
+EOF
 }
 
 function print_resources {
