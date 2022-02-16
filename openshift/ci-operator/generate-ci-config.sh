@@ -49,6 +49,7 @@ function print_single_test {
   local do_claim=${4}
   local workflow=${5}
   local cron=${6}
+  local optional=${7}
 
 
   cat <<EOF
@@ -92,6 +93,12 @@ if [[ -n "$cron" ]]; then
 EOF
 fi
 
+if [[ "$optional" == true ]]; then
+  cat <<EOF
+  optional: true
+EOF
+fi
+
 }
 
 function print_base_images {
@@ -115,32 +122,25 @@ test_binary_build_commands: make test-install
 EOF
 }
 
-function print_not_openshift_47 {
-  print_single_test      "e2e-aws-ocp-${openshift//./}"                      "make test-e2e"               ""    "true" "generic-claim" ""
-
-  if [[ "$openshift" == "4.9" ]]; then
-    # TODO: optional: true
-    print_single_test    "so-forward-compatibility-ocp-${openshift//./}"     "make test-so-forward-compat" ""    "true" "generic-claim" ""
-  fi
-
-  if [[ "$generate_continuous" == true ]]; then
-    print_single_test    "e2e-aws-ocp-${openshift//./}-continuous"           "make test-e2e"               ""    "true" "generic-claim" "0 */12 * * 1-5"
-  fi
-}
-
-function print_openshift_47 {
-  print_single_test      "e2e-aws-ocp-${openshift//./}"                      "make test-e2e"               "aws" "false" "ipi-aws" ""
-
-  if [[ "$generate_continuous" == true ]]; then
-    print_single_test    "e2e-aws-ocp-${openshift//./}-continuous"  "make test-e2e"          "aws" "false" "ipi-aws" "0 */12 * * 1-5"
-  fi
-}
-
 function print_tests {
-  if [[ "$openshift" != "4.7" ]]; then
-    print_not_openshift_47
+  cat <<EOF
+tests:
+EOF
+
+  if [[ "$openshift" == "4.7" ]]; then
+    print_single_test "e2e-aws-ocp-${openshift//./}" "make test-e2e"  "aws" "false" "ipi-aws" "" "false"
+    if [[ "$generate_continuous" == true ]]; then
+      print_single_test "e2e-aws-ocp-${openshift//./}-continuous" "make test-e2e" "aws" "false" "ipi-aws" "0 */12 * * 1-5" "false"
+    fi
   else
-    print_openshift_47
+    print_single_test "e2e-aws-ocp-${openshift//./}" "make test-e2e" "" "true" "generic-claim" "" "false"
+    if [[ "$generate_continuous" == true ]]; then
+      print_single_test "e2e-aws-ocp-${openshift//./}-continuous" "make test-e2e" "" "true" "generic-claim" "0 */12 * * 1-5" "false"
+    fi
+
+    if [[ "$openshift" == "4.9" ]]; then
+      print_single_test "so-forward-compatibility-ocp-${openshift//./}" "make test-so-forward-compat" "" "true" "generic-claim" "" "true"
+    fi
   fi
 }
 
