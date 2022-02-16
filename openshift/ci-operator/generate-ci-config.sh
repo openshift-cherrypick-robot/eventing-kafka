@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 branch=${1-'knative-v0.19.1'}
 openshift=${2-'4.6'}
@@ -42,6 +42,58 @@ EOF
   done
 }
 
+function print_single_test {
+  local name=${1}
+  local commands=${2}
+  local cluster_profile=${3}
+  local do_claim=${4}
+  local workflow=${5}
+  local cron=${6}
+
+
+  cat <<EOF
+- as: ${name}
+  steps:
+    test:
+    - as: test
+      cli: latest
+      commands: ${commands}
+      dependencies:
+$image_deps
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: ${workflow}
+EOF
+
+if [[ -n "$cluster_profile" ]]; then
+ cat <<EOF
+    cluster_profile: ${cluster_profile}
+EOF
+fi
+
+if [[ "$do_claim" == true ]]; then
+cat <<EOF
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "$openshift"
+EOF
+fi
+
+if [[ -n "$cron" ]]; then
+ cat <<EOF
+  cron: ${cron}
+EOF
+fi
+
+}
+
 function print_base_images {
   cat <<EOF
 base_images:
@@ -64,120 +116,23 @@ EOF
 }
 
 function print_not_openshift_47 {
-  cat <<EOF
-tests:
-- as: e2e-aws-ocp-${openshift//./}
-  steps:
-    test:
-    - as: test
-      cli: latest
-      commands: make test-e2e
-      dependencies:
-$image_deps
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 4h0m0s
-    workflow: generic-claim
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "$openshift"
-EOF
+  print_single_test      "e2e-aws-ocp-${openshift//./}"                      "make test-e2e"               ""    "true" "generic-claim" ""
+
   if [[ "$openshift" == "4.9" ]]; then
-    cat <<EOF
-- as: so-forward-compatibility-ocp-${openshift//./}
-  optional: true
-  steps:
-    test:
-    - as: test
-      cli: latest
-      commands: make test-so-forward-compat
-      dependencies:
-$image_deps
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 4h0m0s
-    workflow: generic-claim
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "$openshift"
-EOF
+    # TODO: optional: true
+    print_single_test    "so-forward-compatibility-ocp-${openshift//./}"     "make test-so-forward-compat" ""    "true" "generic-claim" ""
   fi
+
   if [[ "$generate_continuous" == true ]]; then
-    cat <<EOF
-- as: e2e-aws-ocp-${openshift//./}-continuous
-  steps:
-    test:
-    - as: test
-      cli: latest
-      commands: make test-e2e
-      dependencies:
-$image_deps
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 4h0m0s
-    workflow: generic-claim
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "$openshift"
-  cron: 0 */12 * * 1-5
-EOF
+    print_single_test    "e2e-aws-ocp-${openshift//./}-continuous"           "make test-e2e"               ""    "true" "generic-claim" "0 */12 * * 1-5"
   fi
 }
 
 function print_openshift_47 {
-  cat <<EOF
-tests:
-- as: e2e-aws-ocp-${openshift//./}
-  steps:
-    test:
-    - as: test
-      cli: latest
-      commands: make test-e2e
-      dependencies:
-$image_deps
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    cluster_profile: aws
-    workflow: ipi-aws
-EOF
+  print_single_test      "e2e-aws-ocp-${openshift//./}"                      "make test-e2e"               "aws" "false" "ipi-aws" ""
+
   if [[ "$generate_continuous" == true ]]; then
-    cat <<EOF
-- as: e2e-aws-ocp-${openshift//./}-continuous
-  steps:
-    test:
-    - as: test
-      cli: latest
-      commands: make test-e2e
-      dependencies:
-$image_deps
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    cluster_profile: aws
-    workflow: ipi-aws
-  cron: 0 */12 * * 1-5
-EOF
+    print_single_test    "e2e-aws-ocp-${openshift//./}-continuous"  "make test-e2e"          "aws" "false" "ipi-aws" "0 */12 * * 1-5"
   fi
 }
 
