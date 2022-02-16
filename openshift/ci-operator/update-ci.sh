@@ -40,6 +40,7 @@ CURDIR=$(dirname $0)
 $CURDIR/generate-ci-config.sh knative-$VERSION 4.7 false false > ${CONFIG}__47.yaml
 $CURDIR/generate-ci-config.sh knative-$VERSION 4.8 true false > ${CONFIG}__48.yaml
 $CURDIR/generate-ci-config.sh knative-$VERSION 4.9 true true > ${CONFIG}__49.yaml
+$CURDIR/generate-ci-config.sh knative-$VERSION 4.10 true true > ${CONFIG}__410.yaml
 
 # Switch to openshift/release to generate PROW files
 cd $OPENSHIFT
