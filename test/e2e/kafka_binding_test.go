@@ -26,5 +26,6 @@ import (
 )
 
 func TestKafkaBinding(t *testing.T) {
+	t.Skip("No longer supported")
 	helpers.TestKafkaBinding(t)
 }

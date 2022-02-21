@@ -56,11 +56,11 @@ func TestKafkaSourceReconciler(t *testing.T) {
 		expectedStatuses sets.String
 		wantRADepCount   int
 	}{{
-		"create_kafka_source",
-		createKafkaSourceWithSinkMissing,
-		sets.NewString("NotFound"),
-		0,
-	}, {
+		//	"create_kafka_source",
+		//	createKafkaSourceWithSinkMissing,
+		//	sets.NewString("NotFound"),
+		//	0,
+		//}, {
 		"create_sink",
 		createChannel,
 		sets.NewString(""),
