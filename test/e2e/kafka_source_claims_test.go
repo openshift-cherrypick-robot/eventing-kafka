@@ -27,5 +27,6 @@ import (
 )
 
 func TestKafkaSourceClaims(t *testing.T) {
+	t.Skip("skip for now")
 	helpers.TestKafkaSourceClaims(t)
 }
