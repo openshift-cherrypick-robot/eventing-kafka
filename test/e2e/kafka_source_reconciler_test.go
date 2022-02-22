@@ -47,6 +47,7 @@ const (
 //TestKafkaSourceReconciler tests various kafka source reconciler statuses
 //RT is short for reconciler test
 func TestKafkaSourceReconciler(t *testing.T) {
+	t.Skip("skip for now")
 	client := testlib.Setup(t, true)
 	defer testlib.TearDown(client)
 
@@ -56,11 +57,11 @@ func TestKafkaSourceReconciler(t *testing.T) {
 		expectedStatuses sets.String
 		wantRADepCount   int
 	}{{
-		//	"create_kafka_source",
-		//	createKafkaSourceWithSinkMissing,
-		//	sets.NewString("NotFound"),
-		//	0,
-		//}, {
+		"create_kafka_source",
+		createKafkaSourceWithSinkMissing,
+		sets.NewString("NotFound"),
+		0,
+	}, {
 		"create_sink",
 		createChannel,
 		sets.NewString(""),
