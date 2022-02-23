@@ -349,7 +349,7 @@ function run_e2e_tests(){
       local run_command="-run ^(${test_name})$"
   fi
 
-  go_test_e2e -tags=e2e,source -timeout=90m -parallel=12 ./test/e2e \
+  go_test_e2e -tags=e2e,consolidated -timeout=90m -parallel=12 ./test/e2e \
     "$run_command" \
     --imagetemplate "${TEST_IMAGE_TEMPLATE}" \
     $common_opts || failed=$?
