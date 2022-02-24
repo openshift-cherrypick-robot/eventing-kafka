@@ -356,5 +356,3 @@ function run_e2e_tests(){
 
   return $failed
 }
-
-find_matching_so_release_branch
