@@ -51,7 +51,7 @@ func Example_min() {
 	//   namespace: bar
 	// spec:
 	//   containers:
-	//   - image: docker.io/edenhill/kafkacat:1.6.0
+	//   - image: quay.io/openshift-knative/kafkacat:1.6.0
 	//     name: producer-container
 	//     command:
 	//     - kafkacat
@@ -109,7 +109,7 @@ func Example_full() {
 	//   namespace: bar
 	// spec:
 	//   containers:
-	//   - image: docker.io/edenhill/kafkacat:1.6.0
+	//   - image: quay.io/openshift-knative/kafkacat:1.6.0
 	//     name: producer-container
 	//     command:
 	//     - kafkacat
