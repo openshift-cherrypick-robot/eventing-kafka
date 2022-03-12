@@ -1,0 +1,48 @@
+diff --git a/test/e2e/helpers/kafka_helper.go b/test/e2e/helpers/kafka_helper.go
+index f48c57081..9c750aba7 100644
+--- a/test/e2e/helpers/kafka_helper.go
++++ b/test/e2e/helpers/kafka_helper.go
+@@ -51,7 +51,7 @@ const (
+ 	strimziTopicResource = "kafkatopics"
+ 	interval             = 3 * time.Second
+ 	timeout              = 4 * time.Minute
+-	kafkaCatImage        = "docker.io/edenhill/kafkacat:1.6.0"
++	kafkaCatImage        = "quay.io/openshift-knative/kafkacat:1.6.0"
+ )
+ 
+ var (
+diff --git a/test/rekt/resources/kafkacat/kafkacat.yaml b/test/rekt/resources/kafkacat/kafkacat.yaml
+index d441bca4e..3f7bdb39f 100644
+--- a/test/rekt/resources/kafkacat/kafkacat.yaml
++++ b/test/rekt/resources/kafkacat/kafkacat.yaml
+@@ -19,7 +19,7 @@ metadata:
+   namespace: {{ .namespace }}
+ spec:
+   containers:
+-  - image: docker.io/edenhill/kafkacat:1.6.0
++  - image: quay.io/openshift-knative/kafkacat:1.6.0
+     name: producer-container
+     command:
+     - kafkacat
+diff --git a/test/rekt/resources/kafkacat/kafkacat_test.go b/test/rekt/resources/kafkacat/kafkacat_test.go
+index 20b12bfc1..7c1a11ae0 100644
+--- a/test/rekt/resources/kafkacat/kafkacat_test.go
++++ b/test/rekt/resources/kafkacat/kafkacat_test.go
+@@ -51,7 +51,7 @@ func Example_min() {
+ 	//   namespace: bar
+ 	// spec:
+ 	//   containers:
+-	//   - image: docker.io/edenhill/kafkacat:1.6.0
++	//   - image: quay.io/openshift-knative/kafkacat:1.6.0
+ 	//     name: producer-container
+ 	//     command:
+ 	//     - kafkacat
+@@ -109,7 +109,7 @@ func Example_full() {
+ 	//   namespace: bar
+ 	// spec:
+ 	//   containers:
+-	//   - image: docker.io/edenhill/kafkacat:1.6.0
++	//   - image: quay.io/openshift-knative/kafkacat:1.6.0
+ 	//     name: producer-container
+ 	//     command:
+ 	//     - kafkacat
