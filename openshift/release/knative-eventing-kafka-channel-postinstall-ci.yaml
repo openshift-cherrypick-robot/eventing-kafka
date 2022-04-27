@@ -84,6 +84,6 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: migrate
-          image: registry.ci.openshift.org/openshift/knative-v1.2.0:knative-eventing-kafka-migrate
+          image: registry.ci.openshift.org/openshift/knative-v1.2.1:knative-eventing-kafka-migrate
           args:
             - "kafkachannels.messaging.knative.dev"
