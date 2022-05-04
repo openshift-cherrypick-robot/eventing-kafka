@@ -27,5 +27,6 @@ import (
 )
 
 func TestChannelChain(t *testing.T) {
+        t.Skip("will be replaced with the new_e2e in broker repo")
 	helpers.ChannelChainTestHelper(context.Background(), t, helpers.SubscriptionV1, channelTestRunner)
 }
